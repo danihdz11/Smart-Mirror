@@ -169,7 +169,7 @@ def saludo_inicial():
         momento = 'Buenas tardes'
 
     # decir saludo
-    hablar(f'{momento}, soy Rebeca, tu asistente de Smart Mirror. Por favor dime en que te puedo ayudar')
+    hablar(f'{momento}, soy Rebeca, tu asistente de Smart Mirror. Cualquier cosa estoy al pendiente')
 
 
 # funcion central del asistente
@@ -216,7 +216,7 @@ def pedir_cosas():
         elif 'espejito espejito' in pedido:
             # aqui se conecta con la base de datos para obtener el nombre real del usuario
             nombre_usuario = "Daniel"  # Nombre temporal
-            hablar(f'Hola {nombre_usuario}, soy Rebeca tu asistente de Smart Mirror')
+            hablar(f'Hola {nombre_usuario}, dime, ¿En qué te puedo ayudar?')
             continue
         elif 'mis hábitos' in pedido or 'mis habitos' in pedido:
             hablar('Aquí tienes un resumen de tus hábitos de hoy. Recuerda beber agua y hacer ejercicio.')
@@ -226,6 +226,21 @@ def pedir_cosas():
             continue
         elif 'el clima' in pedido or 'clima' in pedido:
             pedir_clima()
+            continue
+        elif 'quiero escuchar música' in pedido or 'reproduce música' in pedido:
+            hablar('Por supuesto, dime qué canción quieres escuchar')
+            # Esperar a que el usuario diga la canción
+            cancion = tranformar_audio_en_texto().lower()
+            if cancion != "sigo esperando":
+                hablar(f'Perfecto, reproduciendo {cancion}')
+                pywhatkit.playonyt(cancion)
+            continue
+        elif 'reproduce' in pedido:
+            # Extraer la canción del comando
+            cancion = pedido.replace('reproduce', '').strip()
+            if cancion:
+                hablar(f'Reproduciendo {cancion}')
+                pywhatkit.playonyt(cancion)
             continue
 
 
