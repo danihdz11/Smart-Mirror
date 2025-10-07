@@ -1,4 +1,7 @@
 import connectDB from "./config/db.js";
+import { testUsers } from "./tests/testUsers.js";
 
-// Llamamos la función de conexión
 connectDB();
+
+// Ejecutar la prueba
+testUsers();
