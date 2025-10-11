@@ -4,4 +4,4 @@ import { testUsers } from "./tests/testUsers.js";
 connectDB();
 
 // Ejecutar la prueba
-testUsers();
+//testUsers();

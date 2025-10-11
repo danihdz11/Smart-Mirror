@@ -9,17 +9,17 @@ const cleanDatabase = async () => {
   try {
     // Conectarse a la base
     await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ Conectado a MongoDB");
+    console.log("Conectado correctamente a MongoDB");
 
     // Eliminar todos los usuarios
     const result = await User.deleteMany({});
-    console.log(`🧹 Usuarios eliminados: ${result.deletedCount}`);
+    console.log(`Usuarios eliminados: ${result.deletedCount}`);
 
     // Cerrar conexión
     await mongoose.disconnect();
-    console.log("🔌 Conexión cerrada. Base limpia.");
+    console.log("Conexión cerrada. Base limpia.");
   } catch (error) {
-    console.error("❌ Error al limpiar la base de datos:", error.message);
+    console.error("Error al limpiar la base de datos:", error.message);
     process.exit(1);
   }
 };
