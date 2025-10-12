@@ -34,9 +34,9 @@ export default function Register() {
     try {
       const res = await registerUser(formData);
       alert(res.message || "Usuario registrado correctamente");
-      console.log("✅ Respuesta:", res);
+      console.log("Respuesta:", res);
     } catch (err: any) {
-      console.error("❌ Error:", err.response?.data || err.message);
+      console.error("Error:", err.response?.data || err.message);
       alert("Error al registrar usuario");
     }
   };
