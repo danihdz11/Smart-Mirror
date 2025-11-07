@@ -1,4 +1,4 @@
-import MirrorView from './components/MirrorView'
+import MirrorView from './pages/MirrorView'
 
 export default function App() {
   return (
