@@ -31,6 +31,7 @@ export const userSchema = Joi.object({
   location: Joi.string().min(2).max(100).required(),
   faceId: Joi.string().allow(null, ""),  // opcional
   imageUrl: Joi.string().uri().allow(null, ""), // opcional
+  face_encoding: Joi.array().items(Joi.number()), //.length(128).required()
   events: Joi.array().items(eventSchema),
   tasks: Joi.array().items(taskSchema)
 });
