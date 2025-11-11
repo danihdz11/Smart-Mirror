@@ -5,7 +5,8 @@ import os
 import time
 
 # ==== CONFIGURACIÓN INICIAL ====
-path = 'Employees'  # carpeta con las imágenes conocidas
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+path = os.path.join(BASE_DIR, 'people')  # carpeta con las imágenes conocidas
 images = []
 classNames = []
 
@@ -43,7 +44,8 @@ print('✅ Codificación completa, cámara iniciando...')
 
 # ==== INICIO DE CÁMARA ====
 # Usamos el mismo backend que funcionó en tu test_cam
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+# cap = cv2.VideoCapture(0, cv2.CAP_V4L2) # para la raspberry pi
+cap = cv2.VideoCapture(0) # para la computadora normal
 
 if not cap.isOpened():
     print("❌ Error: no se pudo abrir la cámara. Revisa /dev/video0 y permisos.")
