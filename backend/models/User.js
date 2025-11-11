@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
   location: { type: String, required: true },            // ciudad del usuario
   faceId: { type: String },                              // ID facial generado por Python
   imageUrl: { type: String },                            // URL de la imagen base
-  face_encoding: {type: [Number], required: true},
+  face_encoding: {type: [Number]},                        // , required: true
   events: [eventSchema],                                 // lista de eventos
   tasks: [taskSchema],                                   // lista de tareas
   createdAt: { type: Date, default: Date.now }           // fecha de creación
