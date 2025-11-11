@@ -49,6 +49,30 @@ const pool = mysql.createPool({
 try {
   const [rows] = await pool.query("SELECT 1 AS ok;");
   console.log("Conexión OK:", rows);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sensors (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      type VARCHAR(50)
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS data (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      sensor_id INT NOT NULL,
+      value FLOAT NOT NULL,
+      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+      FOREIGN KEY (sensor_id) REFERENCES sensors(id)
+       ON DELETE CASCADE
+       ON UPDATE CASCADE
+    );
+  `)
+
+  console.log("Tables created!");
+
 } catch (err) {
   console.error("Error conectando:", err?.message);
 }
