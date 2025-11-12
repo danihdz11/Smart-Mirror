@@ -26,5 +26,5 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 
-const PORT = 5000;
+const PORT = 5001;
 app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
