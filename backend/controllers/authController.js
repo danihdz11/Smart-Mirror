@@ -102,6 +102,7 @@ export const registerUser = async (req, res) => {
     try {
       faceEncoding = await generateFaceEncoding(faceImage.path);
     } catch (error) {
+      console.error("Error generando codificación facial:", error);
       return res.status(400).json({
         message: "No se pudo generar la codificación facial",
         error: error.message
