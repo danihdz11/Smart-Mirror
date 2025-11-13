@@ -2,7 +2,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MirrorView from "./pages/MirrorView";
-import WeatherWidget from "./weather/weatherWidget/weatherWidget";
+import WeatherWidget from "./widgets/weatherWidget/weatherWidget";
+import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
+import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
+
 
 function App() {
   return (
@@ -18,9 +21,10 @@ function App() {
                 Reloj
               </div>
 
-              {/* Aquí estaba tu widget de clima */}
-              <div className="absolute top-6 right-6 pointer-events-auto">
+              <div className="absolute top-6 right-6 flex flex-col gap-4 pointer-events-auto">
                 <WeatherWidget />
+                <ToDoWidget />
+                <QuoteWidget />
               </div>
 
               <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
