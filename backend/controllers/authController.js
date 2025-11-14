@@ -11,7 +11,7 @@ const JWT_SECRET = "supersecret"; // puedes moverlo a .env después
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PYTHON_BIN = process.env.PYTHON_PATH || "python";
+const PYTHON_BIN = process.env.PYTHON_PATH || "C:\\Users\\DanielHDev\\AppData\\Local\\Programs\\Python\\Python311\\python.exe";
 const ENCODER_SCRIPT = path.join(__dirname, "..", "utils", "encode_face.py");
 
 const generateFaceEncoding = (imagePath) =>
