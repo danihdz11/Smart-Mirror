@@ -56,7 +56,13 @@ try {
       name VARCHAR(100) NOT NULL,
       type VARCHAR(50)
     );
-  `)
+  `);
+
+  await pool.query(`
+    INSERT INTO sensors (name, type) VALUES
+      ('caja/porcentaje', 'ldr'),
+      ('caja/movimiento', 'pir');
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS data (
@@ -69,7 +75,7 @@ try {
        ON DELETE CASCADE
        ON UPDATE CASCADE
     );
-  `)
+  `);
 
   console.log("Tables created!");
 
