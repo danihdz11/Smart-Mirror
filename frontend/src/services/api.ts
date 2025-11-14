@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/auth";
+const API_URL = "http://localhost:5001/api/auth";
 
 export interface RegisterData {
   name: string;
@@ -15,8 +15,21 @@ export interface LoginData {
   password: string;
 }
 
-export const registerUser = async (userData: RegisterData) => {
-  const res = await axios.post(`${API_URL}/register`, userData);
+export const registerUser = async (userData: RegisterData, faceImage?: File | null) => {
+  const formData = new FormData();
+  formData.append("name", userData.name);
+  formData.append("age", String(userData.age));
+  formData.append("email", userData.email);
+  formData.append("password", userData.password);
+  formData.append("location", userData.location);
+
+  if (faceImage) {
+    formData.append("faceImage", faceImage);
+  }
+
+  const res = await axios.post(`${API_URL}/register`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
   return res.data;
 };
 
