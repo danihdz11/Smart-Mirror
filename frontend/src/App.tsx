@@ -5,7 +5,7 @@ import MirrorView from "./pages/MirrorView";
 import WeatherWidget from "./widgets/weatherWidget/weatherWidget";
 import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
 import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
-
+import NewsWidget from "./widgets/newsWidget/newsWidget"; // <- Importamos el widget de noticias
 
 function App() {
   return (
@@ -25,6 +25,7 @@ function App() {
                 <WeatherWidget />
                 <ToDoWidget />
                 <QuoteWidget />
+                <NewsWidget /> {/* <- Aquí añadimos el widget de noticias */}
               </div>
 
               <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">

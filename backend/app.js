@@ -1,21 +1,36 @@
-// import connectDB from "./config/db.js";
-// import { testUsers } from "./tests/testUsers.js";
-// connectDB();
-// Ejecutar la prueba
-//testUsers();
-
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// 👉 Log para verificar que sí se lee el .env
+console.log("KEY DESDE APP:", process.env.NEWS_API_KEY);
+
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import newsRoutes from "./routes/newsRoutes.js";
 
 const app = express();
+
+// 🔌 Conectar a la base de datos
 connectDB();
 
-app.use(cors());
+// 🧩 Middlewares
+app.use(cors({
+  origin: ["http://localhost:5173"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
+// 🗞️ Rutas
+app.use("/api/news", newsRoutes);
 app.use("/api/auth", authRoutes);
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+// 🚀 Iniciar servidor
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () =>
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`)
+);
