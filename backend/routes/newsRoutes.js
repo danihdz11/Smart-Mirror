@@ -15,9 +15,6 @@ router.get("/", async (req, res) => {
 
     const response = await fetch(url);
 
-    // 👉 Log para ver qué responde la API externa
-    console.log("Status de la API externa:", response.status);
-
     if (!response.ok) {
       return res.status(500).json({
         error: `Error API externa: ${response.status}`
