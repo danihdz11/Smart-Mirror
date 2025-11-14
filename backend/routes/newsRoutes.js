@@ -3,8 +3,6 @@ import fetch from "node-fetch";
 
 const router = express.Router();
 
-// 👉 Log para verificar que sí llega la KEY desde dotenv
-console.log("KEY DESDE NEWS:", process.env.NEWS_API_KEY);
 
 router.get("/", async (req, res) => {
   try {

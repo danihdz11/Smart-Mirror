@@ -4,8 +4,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// 👉 Log para verificar que sí se lee el .env
-console.log("KEY DESDE APP:", process.env.NEWS_API_KEY);
 
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
