@@ -8,6 +8,7 @@ dotenv.config();
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import newsRoutes from "./routes/newsRoutes.js";
+import weatherRoutes from "./routes/weatherRoutes.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(express.json());
 // 🗞️ Rutas
 app.use("/api/news", newsRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/weather", weatherRoutes);
 
 // 🚀 Iniciar servidor
 const PORT = process.env.PORT || 5001;
