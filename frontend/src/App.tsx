@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MirrorView from "./pages/MirrorView";
@@ -14,7 +14,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
-          path="/"
+          path="/mirror"
           element={
             <MirrorView>
               <div className="absolute top-6 left-6 pointer-events-auto text-white text-2xl">
@@ -34,6 +34,7 @@ function App() {
             </MirrorView>
           }
         />
+        <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );

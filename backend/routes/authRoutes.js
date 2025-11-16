@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { registerUser, loginUser } from "../controllers/authController.js";
+import { registerUser, loginUser, loginWithFace } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -30,5 +30,6 @@ const upload = multer({ storage });
 
 router.post("/register", upload.single("faceImage"), registerUser);
 router.post("/login", loginUser);
+router.post("/face-login", upload.single("faceImage"), loginWithFace);
 
 export default router;

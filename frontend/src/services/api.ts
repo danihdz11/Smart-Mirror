@@ -37,3 +37,13 @@ export const loginUser = async (credentials: LoginData) => {
   const res = await axios.post(`${API_URL}/login`, credentials);
   return res.data;
 };
+
+export const loginWithFace = async (faceImage: File) => {
+  const formData = new FormData();
+  formData.append("faceImage", faceImage);
+
+  const res = await axios.post(`${API_URL}/face-login`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return res.data;
+};
