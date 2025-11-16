@@ -6,6 +6,7 @@ import WeatherWidget from "./widgets/weatherWidget/weatherWidget";
 import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
 import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
 import NewsWidget from "./widgets/newsWidget/newsWidget"; // <- Importamos el widget de noticias
+import ClockWidget from "./widgets/clockWidget/clockWidget";
 
 function App() {
   return (
@@ -17,8 +18,8 @@ function App() {
           path="/mirror"
           element={
             <MirrorView>
-              <div className="absolute top-6 left-6 pointer-events-auto text-white text-2xl">
-                Reloj
+              <div className="absolute top-6 left-6 pointer-events-auto">
+                <ClockWidget />
               </div>
 
               <div className="absolute top-6 right-6 flex flex-col gap-4 pointer-events-auto">
