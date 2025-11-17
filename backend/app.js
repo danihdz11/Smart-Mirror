@@ -9,6 +9,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import newsRoutes from "./routes/newsRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use(express.json());
 app.use("/api/news", newsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/weather", weatherRoutes);
+app.use("/api/tasks", taskRoutes);
 
 // 🚀 Iniciar servidor
 const PORT = process.env.PORT || 5001;

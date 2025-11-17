@@ -8,6 +8,8 @@ import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
 import NewsWidget from "./widgets/newsWidget/newsWidget"; // <- Importamos el widget de noticias
 import ClockWidget from "./widgets/clockWidget/clockWidget";
 import AuthButtons from "./widgets/authButtons/authButtons";
+import AddTaskWidget from "./widgets/addTaskWidget/addTaskWidget";
+
 
 
 function App() {
@@ -32,9 +34,11 @@ function App() {
                 <NewsWidget /> {/* <- Aquí añadimos el widget de noticias */}
               </div>
 
-              <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
+              {/* <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
                 holaaaaaa
-              </button>
+              </button> */}
+
+              <AddTaskWidget />
             </MirrorView>
           }
         />
