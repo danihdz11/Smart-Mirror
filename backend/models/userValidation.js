@@ -13,7 +13,7 @@ export const eventSchema = Joi.object({
 // Validación de tareas
 export const taskSchema = Joi.object({
   title: Joi.string().min(3).max(100).required(),
-  date: Joi.date().required(),
+  date: Joi.date().optional().allow(null),    // .required()
   time: Joi.string()
     .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
     .required(),

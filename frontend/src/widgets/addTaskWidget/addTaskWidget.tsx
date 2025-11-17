@@ -21,12 +21,16 @@ export default function AddTaskWidget() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          userId: user.id,
-          title,
-          date: new Date(),
-          time: "00:00",
-          repeat: "none"
+        userId: user.id,
+        title
         })
+        // body: JSON.stringify({
+        //   userId: user.id,
+        //   title,
+        //   date: new Date(),
+        //   time: "00:00",
+        //   repeat: "none"
+        // })
       });
 
       const result = await response.json();
