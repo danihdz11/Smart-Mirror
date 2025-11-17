@@ -7,6 +7,8 @@ import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
 import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
 import NewsWidget from "./widgets/newsWidget/newsWidget"; // <- Importamos el widget de noticias
 import ClockWidget from "./widgets/clockWidget/clockWidget";
+import AuthButtons from "./widgets/authButtons/authButtons";
+
 
 function App() {
   return (
@@ -18,6 +20,7 @@ function App() {
           path="/mirror"
           element={
             <MirrorView>
+              <AuthButtons />
               <div className="absolute top-6 left-6 pointer-events-auto">
                 <ClockWidget />
               </div>
@@ -35,7 +38,8 @@ function App() {
             </MirrorView>
           }
         />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* <Route path="/" element={<Navigate to="/login" replace />} /> */}
+        <Route path="/" element={<Navigate to="/mirror" replace />} />
       </Routes>
     </BrowserRouter>
   );
