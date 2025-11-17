@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Definiciones de tipos para Web Speech API
 interface SpeechRecognition extends EventTarget {
@@ -52,10 +52,14 @@ declare var webkitSpeechRecognition: {
 
 export function useVirtualAssistant() {
   const navigate = useNavigate();
+  const location = useLocation();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
   const [isListening, setIsListening] = useState(false);
   const hasGreetedRef = useRef(false);
+  const hasAskedLoginRef = useRef(false);
+  const isWaitingForAnswerRef = useRef(false);
+  const hasWelcomedToProfileRef = useRef(false);
 
   // Inicializar reconocimiento de voz
   useEffect(() => {
@@ -79,14 +83,65 @@ export function useVirtualAssistant() {
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript.toLowerCase().trim();
       console.log('Escuché:', transcript);
+      console.log('¿Estamos esperando respuesta?', isWaitingForAnswerRef.current);
+      console.log('¿Estamos en login?', location.pathname === '/login');
 
-      // Detectar comando para iniciar sesión
-      if (transcript.includes('quiero iniciar sesión') || 
-          transcript.includes('quiero iniciar sesion') ||
-          transcript.includes('iniciar sesión') ||
-          transcript.includes('iniciar sesion')) {
+      // Si estamos en la página de login y estamos esperando respuesta
+      if (isWaitingForAnswerRef.current && location.pathname === '/login') {
+        // Detectar "sí" o "no" - más variantes
+        const normalizedTranscript = transcript.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Quitar acentos
+        if (normalizedTranscript.includes('si') || 
+            normalizedTranscript.includes('yes') || 
+            normalizedTranscript.includes('ok') ||
+            normalizedTranscript.includes('okey') ||
+            normalizedTranscript.includes('claro') ||
+            normalizedTranscript.includes('por supuesto') ||
+            normalizedTranscript.includes('adelante')) {
+          console.log('✅ Usuario dijo sí, activando reconocimiento facial...');
+          isWaitingForAnswerRef.current = false;
+          // Detener el reconocimiento temporalmente
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+            } catch (e) {
+              console.error('Error al detener reconocimiento:', e);
+            }
+          }
+          // Disparar evento para activar reconocimiento facial
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('activateFaceLogin'));
+          }, 300);
+        } else if (normalizedTranscript.includes('no') || 
+                   normalizedTranscript.includes('nop') ||
+                   normalizedTranscript.includes('cancelar')) {
+          console.log('❌ Usuario dijo no');
+          isWaitingForAnswerRef.current = false;
+          speak('De acuerdo, cuando estés listo di "quiero iniciar sesión"');
+          // Reiniciar el reconocimiento después de un momento
+          setTimeout(() => {
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                console.error('Error al reiniciar reconocimiento:', e);
+              }
+            }
+          }, 2000);
+        } else {
+          console.log('No se reconoció una respuesta válida, continuando escucha...');
+        }
+        return;
+      }
+
+      // Detectar comando para iniciar sesión (solo si no estamos en login)
+      if (location.pathname !== '/login' && 
+          (transcript.includes('quiero iniciar sesión') || 
+           transcript.includes('quiero iniciar sesion') ||
+           transcript.includes('iniciar sesión') ||
+           transcript.includes('iniciar sesion'))) {
         console.log('Navegando a login...');
         navigate('/login');
       }
@@ -102,16 +157,28 @@ export function useVirtualAssistant() {
 
     recognition.onend = () => {
       setIsListening(false);
-      // Reiniciar el reconocimiento si no se detuvo manualmente y no hay usuario logueado
-      if (hasGreetedRef.current) {
-        const user = localStorage.getItem('user');
-        if (!user) {
-          try {
-            recognition.start();
-          } catch (e) {
-            // Ignorar errores al reiniciar
+      console.log('Reconocimiento terminado');
+      
+      // Reiniciar si:
+      // 1. Estamos esperando una respuesta en login
+      // 2. No hay usuario logueado y ya saludamos
+      // 3. Hay usuario logueado y estamos en el perfil (/mirror)
+      const user = localStorage.getItem('user');
+      const shouldRestart = (isWaitingForAnswerRef.current && location.pathname === '/login') ||
+                           (!user && hasGreetedRef.current) ||
+                           (user && location.pathname === '/mirror' && hasWelcomedToProfileRef.current);
+      
+      if (shouldRestart) {
+        console.log('Reiniciando reconocimiento...');
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              console.error('Error al reiniciar reconocimiento:', e);
+            }
           }
-        }
+        }, 500);
       }
     };
 
@@ -122,7 +189,7 @@ export function useVirtualAssistant() {
         recognitionRef.current.stop();
       }
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Función para hablar
   const speak = (text: string) => {
@@ -188,6 +255,101 @@ export function useVirtualAssistant() {
       clearTimeout(timer);
     };
   }, []);
+
+  // Cuando llegamos a la página de login, preguntar si desea iniciar sesión
+  useEffect(() => {
+    if (location.pathname === '/login' && !hasAskedLoginRef.current) {
+      hasAskedLoginRef.current = true;
+      isWaitingForAnswerRef.current = false;
+      
+      console.log('Llegamos a la página de login, preparando pregunta...');
+      
+      // Esperar un momento para que la página cargue
+      const timer = setTimeout(() => {
+        console.log('Haciendo pregunta: ¿Deseas iniciar sesión?');
+        speak('¿Deseas iniciar sesión?');
+        
+        // Esperar a que termine de hablar antes de activar el reconocimiento
+        setTimeout(() => {
+          isWaitingForAnswerRef.current = true;
+          console.log('Ahora estamos esperando respuesta del usuario');
+          
+          // Asegurarse de que el reconocimiento esté activo
+          setTimeout(() => {
+            if (recognitionRef.current) {
+              try {
+                console.log('Iniciando reconocimiento de voz...');
+                recognitionRef.current.start();
+              } catch (e) {
+                console.error('Error al iniciar reconocimiento en login:', e);
+                // Intentar de nuevo después de un momento
+                setTimeout(() => {
+                  if (recognitionRef.current) {
+                    try {
+                      recognitionRef.current.start();
+                    } catch (e2) {
+                      console.error('Error al reintentar reconocimiento:', e2);
+                    }
+                  }
+                }, 1000);
+              }
+            }
+          }, 500);
+        }, 1500); // Esperar a que termine de hablar
+      }, 1000);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else if (location.pathname !== '/login') {
+      // Resetear cuando salimos de login
+      console.log('Saliendo de login, reseteando estado');
+      hasAskedLoginRef.current = false;
+      isWaitingForAnswerRef.current = false;
+    }
+  }, [location.pathname]);
+
+  // Cuando el usuario entra a su perfil (/mirror), saludarlo
+  useEffect(() => {
+    if (location.pathname === '/mirror') {
+      const userFromStorage = localStorage.getItem('user');
+      
+      if (userFromStorage && !hasWelcomedToProfileRef.current) {
+        try {
+          const user = JSON.parse(userFromStorage);
+          const userName = user.name || 'Usuario';
+          
+          console.log(`Usuario ${userName} entró a su perfil, saludando...`);
+          
+          // Esperar un momento para que la página cargue completamente
+          const timer = setTimeout(() => {
+            hasWelcomedToProfileRef.current = true;
+            speak(`Bienvenido ${userName}, dime, ¿en qué te puedo ayudar hoy?`);
+            
+            // Iniciar el reconocimiento después del saludo
+            setTimeout(() => {
+              if (recognitionRef.current) {
+                try {
+                  recognitionRef.current.start();
+                } catch (e) {
+                  console.error('Error al iniciar reconocimiento en perfil:', e);
+                }
+              }
+            }, 2000);
+          }, 1000);
+
+          return () => {
+            clearTimeout(timer);
+          };
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+    } else if (location.pathname !== '/mirror') {
+      // Resetear cuando salimos del perfil
+      hasWelcomedToProfileRef.current = false;
+    }
+  }, [location.pathname]);
 
   // Cargar voces disponibles
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginWithFace } from "../services/api";
 
@@ -85,7 +85,7 @@ export default function Login() {
     });
   };
 
-  const handleFaceLogin = async () => {
+  const handleFaceLogin = useCallback(async () => {
     if (isScanning) return;
 
     setIsScanning(true);
@@ -121,7 +121,29 @@ export default function Login() {
       setStatus("");
       setIsScanning(false);
     }
-  };
+  }, [isScanning, navigate]);
+
+  // Escuchar evento para activar reconocimiento facial automáticamente
+  useEffect(() => {
+    console.log('Login: Configurando listener para activateFaceLogin');
+    
+    const handleActivateFaceLogin = () => {
+      console.log('✅ Login: Evento activateFaceLogin recibido, activando reconocimiento facial...');
+      // Esperar un momento para asegurar que la cámara esté lista
+      setTimeout(() => {
+        console.log('Login: Ejecutando handleFaceLogin...');
+        handleFaceLogin();
+      }, 500);
+    };
+
+    window.addEventListener('activateFaceLogin', handleActivateFaceLogin);
+    console.log('Login: Listener agregado correctamente');
+
+    return () => {
+      console.log('Login: Removiendo listener');
+      window.removeEventListener('activateFaceLogin', handleActivateFaceLogin);
+    };
+  }, [handleFaceLogin]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
