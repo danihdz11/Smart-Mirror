@@ -12,12 +12,19 @@ import NewsWidget from "./widgets/newsWidget/newsWidget"; // <- Importamos el wi
 import ClockWidget from "./widgets/clockWidget/clockWidget";
 import AuthButtons from "./widgets/authButtons/authButtons";
 import AddTaskWidget from "./widgets/addTaskWidget/addTaskWidget";
+import { useVirtualAssistant } from "./hooks/useVirtualAssistant";
 
+// Componente para inicializar el asistente virtual
+function VirtualAssistantInitializer() {
+  useVirtualAssistant();
+  return null;
+}
 
 function App() {
   const [refreshTasks, setRefreshTasks] = useState(0);
   return (
     <BrowserRouter>
+      <VirtualAssistantInitializer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
