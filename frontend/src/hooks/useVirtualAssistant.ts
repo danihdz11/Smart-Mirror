@@ -136,6 +136,54 @@ export function useVirtualAssistant() {
         return;
       }
 
+      // Detectar comando para salir/logout (solo si estamos en el perfil)
+      if (location.pathname === '/mirror') {
+        const normalizedTranscript = transcript.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Quitar acentos
+        if (normalizedTranscript.includes('salir') || 
+            normalizedTranscript.includes('cerrar sesion') ||
+            normalizedTranscript.includes('cerrar sesión') ||
+            normalizedTranscript.includes('logout') ||
+            normalizedTranscript.includes('desconectar')) {
+          console.log('Usuario pidió salir, ejecutando logout...');
+          
+          // Detener el reconocimiento
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+            } catch (e) {
+              console.error('Error al detener reconocimiento:', e);
+            }
+          }
+          
+          // Ejecutar logout
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          
+          // Disparar evento personalizado para que otros componentes se actualicen
+          window.dispatchEvent(new CustomEvent('userLogout'));
+          
+          // Resetear estados
+          hasWelcomedToProfileRef.current = false;
+          hasGreetedRef.current = false;
+          
+          speak('Sesión cerrada. Hasta luego.');
+          
+          // Reiniciar el reconocimiento después de un momento para el saludo inicial
+          setTimeout(() => {
+            hasGreetedRef.current = false;
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                console.error('Error al reiniciar reconocimiento:', e);
+              }
+            }
+          }, 3000);
+          
+          return;
+        }
+      }
+
       // Detectar comando para iniciar sesión (solo si no estamos en login)
       if (location.pathname !== '/login' && 
           (transcript.includes('quiero iniciar sesión') || 
