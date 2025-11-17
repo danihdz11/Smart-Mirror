@@ -6,15 +6,35 @@ export default function AuthButtons() {
   const [userExists, setUserExists] = useState<boolean>(false);
 
   // Revisar si hay sesión en localStorage
+  // También escuchar cambios cuando el usuario hace login/logout
   useEffect(() => {
-    const user = localStorage.getItem("user");
-    setUserExists(!!user);
+    const checkUser = () => {
+      const user = localStorage.getItem("user");
+      setUserExists(!!user);
+    };
+    
+    // Verificar al montar
+    checkUser();
+    
+    // Escuchar cambios en localStorage (por si se modifica desde otra pestaña/componente)
+    window.addEventListener('storage', checkUser);
+    
+    // También verificar periódicamente para cambios locales
+    const interval = setInterval(checkUser, 500);
+    
+    return () => {
+      window.removeEventListener('storage', checkUser);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     setUserExists(false);
+    
+    // Disparar evento personalizado para que otros componentes se actualicen
+    window.dispatchEvent(new CustomEvent('userLogout'));
     // navigate("/login");
   };
 

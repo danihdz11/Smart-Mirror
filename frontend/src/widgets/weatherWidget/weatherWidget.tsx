@@ -56,7 +56,28 @@ const WeatherWidget: React.FC = () => {
       fetchWeather();
     }, 5 * 60 * 1000); // 5 minutos
 
-    return () => clearInterval(interval);
+    // Escuchar cambios en localStorage para resetear cuando se hace logout
+    const checkUser = () => {
+      const userFromStorage = localStorage.getItem("user");
+      if (!userFromStorage) {
+        // Resetear a valores por defecto cuando no hay usuario
+        fetchWeather(); // Esto usará la ciudad por defecto
+      } else {
+        fetchWeather(); // Actualizar con la ubicación del usuario
+      }
+    };
+
+    // Verificar periódicamente cambios en localStorage
+    const userCheckInterval = setInterval(checkUser, 500);
+
+    // También escuchar eventos de storage
+    window.addEventListener('storage', checkUser);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(userCheckInterval);
+      window.removeEventListener('storage', checkUser);
+    };
   }, []);
 
   const getBackgroundColor = () => {

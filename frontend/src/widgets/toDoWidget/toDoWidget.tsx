@@ -13,16 +13,55 @@ interface TodoWidgetProps {
 const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  // Leer usuario actual desde localStorage
-  const user = localStorage.getItem("user")
-    ? JSON.parse(localStorage.getItem("user")!)
-    : null;
+  // Escuchar cambios en localStorage para resetear cuando se hace logout
+  useEffect(() => {
+    const checkUser = () => {
+      const userFromStorage = localStorage.getItem("user");
+      if (userFromStorage) {
+        try {
+          setUser(JSON.parse(userFromStorage));
+        } catch (e) {
+          setUser(null);
+          setTasks([]);
+        }
+      } else {
+        setUser(null);
+        setTasks([]); // Resetear tareas cuando no hay usuario
+      }
+    };
+
+    // Handler para logout
+    const handleLogout = () => {
+      setUser(null);
+      setTasks([]);
+    };
+
+    // Verificar al montar
+    checkUser();
+
+    // Verificar periódicamente cambios en localStorage
+    const interval = setInterval(checkUser, 500);
+
+    // Escuchar eventos de storage (por si se modifica desde otra pestaña)
+    window.addEventListener('storage', checkUser);
+
+    // Escuchar evento personalizado de logout
+    window.addEventListener('userLogout', handleLogout);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', checkUser);
+      window.removeEventListener('userLogout', handleLogout);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         if (!user) {
+          setTasks([]);
           setLoading(false);
           return;
         }
@@ -37,16 +76,18 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
           setTasks(data.tasks || []);
         } else {
           console.error("Error fetching tasks:", data.message);
+          setTasks([]);
         }
       } catch (error) {
         console.error("Error:", error);
+        setTasks([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTasks();
-  }, [refresh]);
+  }, [refresh, user]);
 
   const toggleTask = (index: number) => {
     const updated = [...tasks];

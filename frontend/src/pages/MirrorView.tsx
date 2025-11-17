@@ -15,21 +15,65 @@ export default function MirrorView({ children }: MirrorViewProps) {
   const [showPermanentMessage, setShowPermanentMessage] = useState(false)
 
   useEffect(() => {
-    // Obtener nombre del usuario desde location state o localStorage
+    // Obtener nombre del usuario solo desde location state (después de login)
+    // No leer de localStorage para que al iniciar la app no haya nadie logueado
     const nameFromState = (location.state as any)?.userName
-    const userFromStorage = localStorage.getItem('user')
     
     if (nameFromState) {
       setUserName(nameFromState)
-    } else if (userFromStorage) {
-      try {
-        const user = JSON.parse(userFromStorage)
-        setUserName(user.name)
-      } catch (e) {
-        console.error('Error parsing user from localStorage:', e)
+    } else {
+      // Si no hay nombre en el state, verificar localStorage (por si viene de un refresh después de login)
+      const userFromStorage = localStorage.getItem('user')
+      if (userFromStorage) {
+        try {
+          const user = JSON.parse(userFromStorage)
+          setUserName(user.name)
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e)
+        }
+      } else {
+        // Si no hay usuario en localStorage, resetear todo
+        setUserName(null)
+        setShowWelcome(false)
+        setShowPermanentMessage(false)
       }
     }
   }, [location.state])
+
+  // Escuchar cambios en localStorage para resetear cuando se hace logout
+  useEffect(() => {
+    const checkUser = () => {
+      const userFromStorage = localStorage.getItem('user')
+      if (!userFromStorage) {
+        // Si se eliminó el usuario, resetear todo
+        setUserName(null)
+        setShowWelcome(false)
+        setShowPermanentMessage(false)
+      }
+    }
+    
+    // Escuchar evento personalizado de logout
+    const handleLogout = () => {
+      setUserName(null)
+      setShowWelcome(false)
+      setShowPermanentMessage(false)
+    }
+    
+    // Verificar periódicamente cambios en localStorage
+    const interval = setInterval(checkUser, 500)
+    
+    // Escuchar eventos de storage (por si se modifica desde otra pestaña)
+    window.addEventListener('storage', checkUser)
+    
+    // Escuchar evento personalizado de logout
+    window.addEventListener('userLogout', handleLogout)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', checkUser)
+      window.removeEventListener('userLogout', handleLogout)
+    }
+  }, [])
 
   useEffect(() => {
     // Ocultar mensaje de bienvenida central después de 5 segundos y mostrar el permanente
