@@ -5,7 +5,12 @@ interface Task {
   done?: boolean;
 }
 
-const TodoWidget: React.FC = () => {
+interface TodoWidgetProps {
+  refresh: number;   // 👈 SE AÑADE ESTA PROP
+}
+
+
+const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +46,7 @@ const TodoWidget: React.FC = () => {
     };
 
     fetchTasks();
-  }, []);
+  }, [refresh]);
 
   const toggleTask = (index: number) => {
     const updated = [...tasks];

@@ -1,7 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MirrorView from "./pages/MirrorView";
+
 import WeatherWidget from "./widgets/weatherWidget/weatherWidget";
 import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
 import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
@@ -11,8 +14,8 @@ import AuthButtons from "./widgets/authButtons/authButtons";
 import AddTaskWidget from "./widgets/addTaskWidget/addTaskWidget";
 
 
-
 function App() {
+  const [refreshTasks, setRefreshTasks] = useState(0);
   return (
     <BrowserRouter>
       <Routes>
@@ -29,7 +32,7 @@ function App() {
 
               <div className="absolute top-6 right-6 flex flex-col gap-4 pointer-events-auto">
                 <WeatherWidget />
-                <ToDoWidget />
+                <ToDoWidget refresh={refreshTasks}/>
                 <QuoteWidget />
                 <NewsWidget /> {/* <- Aquí añadimos el widget de noticias */}
               </div>
@@ -38,7 +41,7 @@ function App() {
                 holaaaaaa
               </button> */}
 
-              <AddTaskWidget />
+              <AddTaskWidget onTaskAdded={() => setRefreshTasks((prev) => prev + 1)}/>
             </MirrorView>
           }
         />

@@ -1,6 +1,10 @@
 import { useState } from "react";
 
-export default function AddTaskWidget() {
+interface AddTaskWidgetProps {
+  onTaskAdded: () => void;
+}
+
+export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -37,6 +41,7 @@ export default function AddTaskWidget() {
 
       if (response.ok) {
         alert("Tarea agregada ✔");
+        onTaskAdded();
         setTitle("");
         setIsOpen(false);
       } else {
