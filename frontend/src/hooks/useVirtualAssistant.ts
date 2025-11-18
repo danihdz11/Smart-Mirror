@@ -60,6 +60,7 @@ export function useVirtualAssistant() {
   const hasAskedLoginRef = useRef(false);
   const isWaitingForAnswerRef = useRef(false);
   const hasWelcomedToProfileRef = useRef(false);
+  const isReadingNewsRef = useRef(false);
 
   // Inicializar reconocimiento de voz
   useEffect(() => {
@@ -189,6 +190,35 @@ export function useVirtualAssistant() {
       // Detectar comando para salir/logout (solo si estamos en el perfil)
       if (location.pathname === '/mirror') {
         const normalizedTranscript = transcript.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Quitar acentos
+        
+        // Detectar comando para leer noticias (solo si no está leyendo ya)
+        if (!isReadingNewsRef.current && 
+            (normalizedTranscript.includes('dime las noticias') || 
+             normalizedTranscript.includes('dime las noticia') ||
+             normalizedTranscript.includes('lee las noticias') ||
+             normalizedTranscript.includes('lee las noticia') ||
+             normalizedTranscript.includes('cuéntame las noticias') ||
+             normalizedTranscript.includes('cuentame las noticias'))) {
+          console.log('Usuario pidió leer las noticias...');
+          
+          // Marcar que estamos leyendo noticias
+          isReadingNewsRef.current = true;
+          
+          // Detener el reconocimiento temporalmente
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+            } catch (e) {
+              console.error('Error al detener reconocimiento:', e);
+            }
+          }
+          
+          // Obtener y leer las noticias del widget
+          fetchNewsAndRead();
+          
+          return;
+        }
+        
         if (normalizedTranscript.includes('salir') || 
             normalizedTranscript.includes('cerrar sesion') ||
             normalizedTranscript.includes('cerrar sesión') ||
@@ -320,6 +350,100 @@ export function useVirtualAssistant() {
 
     window.speechSynthesis.speak(utterance);
     synthesisRef.current = window.speechSynthesis;
+  };
+
+  // Función para obtener y leer las noticias del widget
+  const fetchNewsAndRead = async () => {
+    try {
+      console.log('Obteniendo noticias del widget...');
+      speak('Obteniendo las noticias del día');
+      
+      const response = await fetch('http://localhost:5001/api/news');
+      const data = await response.json();
+      const articles = (data?.data || []).slice(0, 5); // Obtener las primeras 5 noticias (igual que el widget)
+      
+      if (articles.length === 0) {
+        speak('Lo siento, no pude obtener las noticias en este momento');
+        // Resetear el flag y reiniciar el reconocimiento
+        setTimeout(() => {
+          isReadingNewsRef.current = false;
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              console.error('Error al reiniciar reconocimiento:', e);
+            }
+          }
+        }, 2000);
+        return;
+      }
+      
+      // Esperar a que termine de decir "Obteniendo las noticias del día"
+      setTimeout(() => {
+        let newsText = 'Aquí están las noticias del día. ';
+        
+        articles.forEach((article: any, index: number) => {
+          const title = article.title || 'Sin título';
+          const source = article.source?.name || 'Fuente desconocida';
+          newsText += `Noticia ${index + 1}: ${title}. Fuente: ${source}. `;
+        });
+        
+        newsText += 'Eso es todo por ahora.';
+        
+        console.log('Leyendo noticias:', newsText);
+        
+        // Crear un utterance para poder detectar cuando termine
+        const utterance = new SpeechSynthesisUtterance(newsText);
+        utterance.lang = 'es-MX';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        // Intentar usar una voz en español
+        const voices = window.speechSynthesis.getVoices();
+        const spanishVoice = voices.find(voice => 
+          voice.lang.includes('es') || voice.lang.includes('ES')
+        );
+        if (spanishVoice) {
+          utterance.voice = spanishVoice;
+        }
+        
+        // Cuando termine de leer, resetear el flag y reiniciar el reconocimiento
+        utterance.onend = () => {
+          console.log('Terminó de leer las noticias');
+          isReadingNewsRef.current = false;
+          
+          // Esperar un momento antes de reiniciar el reconocimiento
+          setTimeout(() => {
+            if (recognitionRef.current && location.pathname === '/mirror') {
+              try {
+                console.log('Reiniciando reconocimiento después de leer noticias');
+                recognitionRef.current.start();
+              } catch (e) {
+                console.error('Error al reiniciar reconocimiento:', e);
+              }
+            }
+          }, 1000);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error al obtener noticias:', error);
+      speak('Lo siento, no pude obtener las noticias en este momento');
+      // Resetear el flag y reiniciar el reconocimiento
+      setTimeout(() => {
+        isReadingNewsRef.current = false;
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (e) {
+            console.error('Error al reiniciar reconocimiento:', e);
+          }
+        }
+      }, 2000);
+    }
   };
 
   // Saludo inicial después de 5 segundos (solo si no hay usuario logueado)
