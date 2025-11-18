@@ -40,7 +40,7 @@ function App() {
               </div>
 
               {/* Calendario (izquierda) */}
-              <div className="absolute top-24 left-6 pointer-events-auto">
+              <div className="absolute bottom-6 left-6 pointer-events-auto">
                 <MiniCalendar />
               </div>
 
