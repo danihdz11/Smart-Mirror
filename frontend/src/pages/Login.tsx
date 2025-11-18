@@ -208,6 +208,57 @@ export default function Login() {
           >
             Reiniciar cámara
           </button>
+
+          {/* --- Login alterno con usuario y contraseña --- */}
+          <div className="mt-10">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-grow h-px bg-gray-300"></div>
+              <span className="text-gray-500 text-sm">o iniciar sesión con usuario y contraseña</span>
+              <div className="flex-grow h-px bg-gray-300"></div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value;
+                const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
+
+                // ⚠️ Aquí llamas tu backend real para login
+                // loginUser(email, password)
+                console.log("Intentando iniciar sesión con:", email, password);
+              }}
+              className="flex flex-col gap-4"
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Correo electrónico"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+
+              <input
+                type="password"
+                name="password"
+                placeholder="Contraseña"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-gray-800 text-white font-semibold hover:bg-gray-900 transition"
+              >
+                Iniciar sesión
+              </button>
+            </form>
+          </div>
+
+
+
+
+
+
         </div>
       </div>
     </div>
