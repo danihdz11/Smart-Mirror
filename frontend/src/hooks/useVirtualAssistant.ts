@@ -277,9 +277,56 @@ export function useVirtualAssistant() {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Error en reconocimiento de voz:', event.error);
+      
+      // Errores que no requieren acción (solo continuar escuchando)
       if (event.error === 'no-speech') {
-        // No hacer nada si no hay habla, solo continuar escuchando
+        console.log('No se detectó habla, continuando escucha...');
         return;
+      }
+      
+      // Errores que requieren reiniciar el reconocimiento
+      if (event.error === 'aborted' || event.error === 'network' || event.error === 'not-allowed') {
+        console.error(`Error crítico en reconocimiento: ${event.error}`);
+        
+        // Si estamos esperando respuesta en login, intentar reiniciar
+        if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+          console.log('Intentando reiniciar reconocimiento después de error...');
+          setTimeout(() => {
+            if (recognitionRef.current && isWaitingForAnswerRef.current) {
+              try {
+                recognitionRef.current.start();
+                console.log('Reconocimiento reiniciado después de error');
+              } catch (e) {
+                console.error('Error al reiniciar reconocimiento después de error:', e);
+                // Intentar una vez más después de un delay más largo
+                setTimeout(() => {
+                  if (recognitionRef.current && isWaitingForAnswerRef.current) {
+                    try {
+                      recognitionRef.current.start();
+                    } catch (e2) {
+                      console.error('Error al reintentar reconocimiento:', e2);
+                    }
+                  }
+                }, 2000);
+              }
+            }
+          }, 1000);
+        }
+        return;
+      }
+      
+      // Para otros errores, intentar reiniciar si estamos esperando respuesta
+      if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+        console.log('Reiniciando reconocimiento después de error desconocido...');
+        setTimeout(() => {
+          if (recognitionRef.current && isWaitingForAnswerRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              console.error('Error al reiniciar reconocimiento:', e);
+            }
+          }
+        }, 1000);
       }
     };
 
@@ -288,7 +335,7 @@ export function useVirtualAssistant() {
       console.log('Reconocimiento terminado');
       
       // Reiniciar si:
-      // 1. Estamos esperando una respuesta en login
+      // 1. Estamos esperando una respuesta en login (IMPORTANTE: reiniciar siempre en este caso)
       // 2. No hay usuario logueado y ya saludamos
       // 3. Hay usuario logueado y estamos en el perfil (/mirror)
       const user = localStorage.getItem('user');
@@ -298,12 +345,38 @@ export function useVirtualAssistant() {
       
       if (shouldRestart) {
         console.log('Reiniciando reconocimiento...');
+        console.log('¿Estamos esperando respuesta?', isWaitingForAnswerRef.current);
+        console.log('¿Estamos en login?', location.pathname === '/login');
+        
         setTimeout(() => {
           if (recognitionRef.current) {
             try {
+              // Verificar que aún estamos en el estado correcto antes de reiniciar
+              if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+                console.log('✅ Reiniciando reconocimiento en login (esperando respuesta)...');
+              }
               recognitionRef.current.start();
-            } catch (e) {
+            } catch (e: any) {
               console.error('Error al reiniciar reconocimiento:', e);
+              // Si el error es porque ya está iniciado, ignorarlo
+              if (e.message && e.message.includes('already started')) {
+                console.log('Reconocimiento ya estaba iniciado, ignorando error');
+                return;
+              }
+              
+              // Para otros errores, intentar de nuevo después de un delay más largo
+              if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+                setTimeout(() => {
+                  if (recognitionRef.current && isWaitingForAnswerRef.current) {
+                    try {
+                      console.log('Reintentando iniciar reconocimiento...');
+                      recognitionRef.current.start();
+                    } catch (e2) {
+                      console.error('Error al reintentar reconocimiento:', e2);
+                    }
+                  }
+                }, 1500);
+              }
             }
           }
         }, 500);
@@ -514,15 +587,36 @@ export function useVirtualAssistant() {
               try {
                 console.log('Iniciando reconocimiento de voz para escuchar respuesta...');
                 recognitionRef.current.start();
-              } catch (e) {
+                console.log('✅ Reconocimiento iniciado correctamente');
+              } catch (e: any) {
                 console.error('Error al iniciar reconocimiento en login:', e);
-                // Intentar de nuevo después de un momento
+                
+                // Si el error es porque ya está iniciado, no hacer nada
+                if (e.message && e.message.includes('already started')) {
+                  console.log('Reconocimiento ya estaba iniciado, continuando...');
+                  return;
+                }
+                
+                // Para otros errores, intentar de nuevo después de un momento
                 setTimeout(() => {
                   if (recognitionRef.current && isWaitingForAnswerRef.current) {
                     try {
+                      console.log('Reintentando iniciar reconocimiento...');
                       recognitionRef.current.start();
-                    } catch (e2) {
+                      console.log('✅ Reconocimiento iniciado en reintento');
+                    } catch (e2: any) {
                       console.error('Error al reintentar reconocimiento:', e2);
+                      // Último intento después de un delay más largo
+                      setTimeout(() => {
+                        if (recognitionRef.current && isWaitingForAnswerRef.current) {
+                          try {
+                            console.log('Último intento de iniciar reconocimiento...');
+                            recognitionRef.current.start();
+                          } catch (e3) {
+                            console.error('Error en último intento:', e3);
+                          }
+                        }
+                      }, 2000);
                     }
                   }
                 }, 1000);
@@ -542,6 +636,30 @@ export function useVirtualAssistant() {
       isWaitingForAnswerRef.current = false;
     }
   }, [location.pathname]);
+
+  // Monitorear y mantener activo el reconocimiento cuando estamos esperando respuesta en login
+  useEffect(() => {
+    if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+      // Verificar periódicamente que el reconocimiento esté activo
+      const checkInterval = setInterval(() => {
+        if (isWaitingForAnswerRef.current && recognitionRef.current && !isListening) {
+          console.log('⚠️ Reconocimiento se detuvo inesperadamente, reiniciando...');
+          try {
+            recognitionRef.current.start();
+            console.log('✅ Reconocimiento reiniciado por monitoreo');
+          } catch (e: any) {
+            if (e.message && !e.message.includes('already started')) {
+              console.error('Error al reiniciar reconocimiento en monitoreo:', e);
+            }
+          }
+        }
+      }, 2000); // Verificar cada 2 segundos
+
+      return () => {
+        clearInterval(checkInterval);
+      };
+    }
+  }, [location.pathname, isListening]);
 
   // Cuando el usuario entra a su perfil (/mirror), saludarlo
   useEffect(() => {
