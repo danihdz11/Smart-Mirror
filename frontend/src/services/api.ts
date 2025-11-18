@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/auth";
+const API_URL = "http://localhost:5001/api";
+const AUTH_URL = `${API_URL}/auth`;
+const WEATHER_URL = `${API_URL}/weather`;
 
 export interface RegisterData {
   name: string;
@@ -15,12 +17,53 @@ export interface LoginData {
   password: string;
 }
 
-export const registerUser = async (userData: RegisterData) => {
-  const res = await axios.post(`${API_URL}/register`, userData);
+export const registerUser = async (userData: RegisterData, faceImage?: File | null) => {
+  const formData = new FormData();
+  formData.append("name", userData.name);
+  formData.append("age", String(userData.age));
+  formData.append("email", userData.email);
+  formData.append("password", userData.password);
+  formData.append("location", userData.location);
+
+  if (faceImage) {
+    formData.append("faceImage", faceImage);
+  }
+
+  const res = await axios.post(`${AUTH_URL}/register`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
   return res.data;
 };
 
 export const loginUser = async (credentials: LoginData) => {
-  const res = await axios.post(`${API_URL}/login`, credentials);
+  const res = await axios.post(`${AUTH_URL}/login`, credentials);
+  return res.data;
+};
+
+export const loginWithFace = async (faceImage: File) => {
+  const formData = new FormData();
+  formData.append("faceImage", faceImage);
+
+  const res = await axios.post(`${AUTH_URL}/face-login`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return res.data;
+};
+
+export interface WeatherData {
+  city: string;
+  country: string;
+  temperature: number;
+  description: string;
+  weatherType: "Soleado" | "Nublado" | "Noche" | "Lluvia";
+  humidity: number;
+  icon: string;
+  feelsLike: number;
+}
+
+export const getWeather = async (city: string, country: string = "MX"): Promise<WeatherData> => {
+  const res = await axios.get(`${WEATHER_URL}`, {
+    params: { city, country }
+  });
   return res.data;
 };

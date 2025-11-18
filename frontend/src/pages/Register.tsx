@@ -1,118 +1,3 @@
-// import { useState } from "react";
-// import { registerUser } from "../services/api";
-
-// // Definimos los tipos del formulario
-// interface RegisterFormData {
-//   name: string;
-//   age: number;
-//   email: string;
-//   password: string;
-//   location: string;
-// }
-
-// export default function Register() {
-//   const [formData, setFormData] = useState<RegisterFormData>({
-//     name: "",
-//     age: 0,
-//     email: "",
-//     password: "",
-//     location: "",
-//   });
-
-//   // Actualiza los valores del formulario
-//   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     const { name, value } = e.target;
-//     setFormData({
-//       ...formData,
-//       [name]: name === "age" ? Number(value) : value,
-//     });
-//   };
-
-//   // Envía el formulario al backend
-//   const handleSubmit = async (e: React.FormEvent) => {
-//     e.preventDefault();
-//     try {
-//       const res = await registerUser(formData);
-//       alert(res.message || "Usuario registrado correctamente");
-//       console.log("Respuesta:", res);
-//     } catch (err: any) {
-//       console.error("Error:", err.response?.data || err.message);
-//       alert("Error al registrar usuario");
-//     }
-//   };
-
-//   return (
-//     <div className="flex items-center justify-center min-h-screen bg-gray-100">
-//       {/* Card */}
-//       <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-//         <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">
-//           Registro de usuario
-//         </h2>
-
-//         <form onSubmit={handleSubmit} className="space-y-4">
-//           <input
-//             name="name"
-//             placeholder="Nombre completo"
-//             value={formData.name}
-//             onChange={handleChange}
-//             required
-//             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//           />
-
-//           <input
-//             name="age"
-//             placeholder="Edad"
-//             type="number"
-//             value={formData.age || ""}
-//             onChange={handleChange}
-//             required
-//             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//           />
-
-//           <input
-//             name="email"
-//             placeholder="Correo electrónico"
-//             type="email"
-//             value={formData.email}
-//             onChange={handleChange}
-//             required
-//             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//           />
-
-//           <input
-//             name="password"
-//             placeholder="Contraseña"
-//             type="password"
-//             value={formData.password}
-//             onChange={handleChange}
-//             required
-//             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//           />
-
-//           <input
-//             name="location"
-//             placeholder="Ubicación"
-//             value={formData.location}
-//             onChange={handleChange}
-//             required
-//             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//           />
-
-//           <button
-//             type="submit"
-//             className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-//           >
-//             Registrarme
-//           </button>
-//         </form>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
 import { useState } from "react";
 import { registerUser } from "../services/api";
 
@@ -178,27 +63,28 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!faceFile) {
+        setFaceError("Debes subir una foto de tu rostro.");
+        return;
+      }
+
       // Solo guardamos los datos del usuario
-      const res = await registerUser(formData);
+      const res = await registerUser(formData, faceFile);
       alert(res.message || "Usuario registrado correctamente");
       console.log("✅ Respuesta:", res);
 
-      // Solo mostramos información del archivo facial si existe
-      if (faceFile) {
-        console.log("📸 Imagen facial temporal:", {
-          name: faceFile.name,
-          sizeKB: Math.round(faceFile.size / 1024),
-          type: faceFile.type,
-        });
-      }
-
-      // NOTA: aquí no se guarda ni se sube la imagen a la base
-      // Tu compañero puede acceder a esta imagen (faceFile)
-      // para procesarla en otro script y generar el vector.
-
+      // Reset form después del registro
+      setFormData({
+        name: "",
+        age: 0,
+        email: "",
+        password: "",
+        location: "",
+      });
+      removeFace();
     } catch (err: any) {
       console.error("❌ Error:", err.response?.data || err.message);
-      alert("Error al registrar usuario");
+      alert(err.response?.data?.message || "Error al registrar usuario");
     }
   };
 

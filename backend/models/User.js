@@ -11,8 +11,8 @@ const eventSchema = new mongoose.Schema({
 // Subdocumento: tareas (con opción de repetición)
 const taskSchema = new mongoose.Schema({
   title: { type: String, required: true },
-  date: { type: Date, required: true },
-  time: { type: String, required: true },
+  date: { type: Date, required: null },
+  time: { type: String, required: null },
   repeat: {
     type: String,
     enum: ["none", "daily", "weekly", "monthly"],

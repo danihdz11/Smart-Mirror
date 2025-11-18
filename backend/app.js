@@ -8,24 +8,31 @@ dotenv.config();
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import newsRoutes from "./routes/newsRoutes.js";
+import weatherRoutes from "./routes/weatherRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 
 const app = express();
 
 // 🔌 Conectar a la base de datos
 connectDB();
 
-// 🧩 Middlewares
-app.use(cors({
-  origin: ["http://localhost:5173"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
-
+app.use(
+  cors({
+    origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Type"],
+    credentials: false,
+    optionsSuccessStatus: 204
+  })
+);
 app.use(express.json());
 
 // 🗞️ Rutas
 app.use("/api/news", newsRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/weather", weatherRoutes);
+app.use("/api/tasks", taskRoutes);
 
 // 🚀 Iniciar servidor
 const PORT = process.env.PORT || 5001;

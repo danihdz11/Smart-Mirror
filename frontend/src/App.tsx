@@ -1,28 +1,42 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MirrorView from "./pages/MirrorView";
+
 import WeatherWidget from "./widgets/weatherWidget/weatherWidget";
 import ToDoWidget from "./widgets/toDoWidget/toDoWidget";
 import QuoteWidget from "./widgets/quoteWidget/quoteWidget";
 import NewsWidget from "./widgets/newsWidget/newsWidget";
 import MiniCalendar from "./widgets/miniCalendarWidget/miniCalendarWidget";
+import ClockWidget from "./widgets/clockWidget/clockWidget";
+import AuthButtons from "./widgets/authButtons/authButtons";
+import AddTaskWidget from "./widgets/addTaskWidget/addTaskWidget";
+import { useVirtualAssistant } from "./hooks/useVirtualAssistant";
+
+// Componente para inicializar el asistente virtual
+function VirtualAssistantInitializer() {
+  useVirtualAssistant();
+  return null;
+}
 
 function App() {
+  const [refreshTasks, setRefreshTasks] = useState(0);
   return (
     <BrowserRouter>
+      <VirtualAssistantInitializer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
         <Route
-          path="/"
+          path="/mirror"
           element={
             <MirrorView>
-
-              {/* Reloj */}
-              <div className="absolute top-6 left-6 pointer-events-auto text-white text-2xl">
-                Reloj
+              <AuthButtons />
+              <div className="absolute top-6 left-6 pointer-events-auto">
+                <ClockWidget />
               </div>
 
               {/* Calendario (izquierda) */}
@@ -33,19 +47,21 @@ function App() {
               {/* Widgets derechos */}
               <div className="absolute top-6 right-6 flex flex-col gap-4 pointer-events-auto">
                 <WeatherWidget />
-                <ToDoWidget />
+                <ToDoWidget refresh={refreshTasks}/>
                 <QuoteWidget />
                 <NewsWidget />
               </div>
 
-              {/* Botón izquierda abajo */}
-              <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
+              {/* <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
                 holaaaaaa
-              </button>
+              </button> */}
 
+              <AddTaskWidget onTaskAdded={() => setRefreshTasks((prev) => prev + 1)}/>
             </MirrorView>
           }
         />
+        {/* <Route path="/" element={<Navigate to="/login" replace />} /> */}
+        <Route path="/" element={<Navigate to="/mirror" replace />} />
       </Routes>
     </BrowserRouter>
   );
