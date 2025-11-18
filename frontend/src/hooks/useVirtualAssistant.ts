@@ -76,6 +76,8 @@ export function useVirtualAssistant() {
     recognition.lang = 'es-MX';
     recognition.continuous = true;
     recognition.interimResults = false;
+    // Aumentar el umbral de confianza - solo procesar resultados con buena confianza
+    // Nota: esto no está disponible en todos los navegadores, pero ayuda cuando está disponible
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -85,24 +87,75 @@ export function useVirtualAssistant() {
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const lastResult = event.results[event.results.length - 1];
       const transcript = lastResult[0].transcript.toLowerCase().trim();
+      const confidence = lastResult[0].confidence || 0;
+      
       console.log('Escuché:', transcript);
+      console.log('Confianza:', confidence);
       console.log('¿Estamos esperando respuesta?', isWaitingForAnswerRef.current);
       console.log('¿Estamos en login?', location.pathname === '/login');
+      
+      // Si la confianza es muy baja, ignorar (probablemente ruido)
+      if (confidence > 0 && confidence < 0.3) {
+        console.log('⚠️ Confianza muy baja, ignorando (probablemente ruido)');
+        return;
+      }
 
       // Si estamos en la página de login y estamos esperando respuesta
-      if (isWaitingForAnswerRef.current && location.pathname === '/login') {
-        // Detectar "sí" o "no" - más variantes
-        const normalizedTranscript = transcript.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Quitar acentos
-        if (normalizedTranscript.includes('si') || 
-            normalizedTranscript.includes('yes') || 
-            normalizedTranscript.includes('ok') ||
-            normalizedTranscript.includes('okey') ||
-            normalizedTranscript.includes('claro') ||
-            normalizedTranscript.includes('por supuesto') ||
-            normalizedTranscript.includes('adelante')) {
-          console.log('✅ Usuario dijo sí, activando reconocimiento facial...');
+      if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+        console.log('🔍 Procesando respuesta en login:', transcript);
+        console.log('Longitud del transcript:', transcript.length);
+        
+        // Detectar "sí" o "no" - validación más estricta
+        const normalizedTranscript = transcript.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); // Quitar acentos y espacios
+        
+        // Validación más estricta: debe ser una palabra/frase clara y no muy corta
+        // Ignorar si es muy corta (probablemente ruido)
+        if (normalizedTranscript.length < 2) {
+          console.log('⚠️ Transcript muy corto, ignorando (probablemente ruido)');
+          return;
+        }
+        
+        // Verificar que realmente sea una respuesta válida - solo palabras completas
+        // Usar expresiones regulares para buscar palabras completas
+        const yesPattern = /\b(si|sí|yes|ok|okey|claro|por supuesto|adelante|afirmativo)\b/i;
+        const noPattern = /\b(no|nop|cancelar|negativo)\b/i;
+        
+        const isYes = yesPattern.test(normalizedTranscript);
+        const isNo = noPattern.test(normalizedTranscript);
+        
+        console.log('¿Es SÍ?', isYes);
+        console.log('¿Es NO?', isNo);
+        
+        if (isYes) {
+          console.log('✅✅✅ Usuario dijo SÍ claramente, activando reconocimiento facial...');
+          // IMPORTANTE: Cambiar el flag ANTES de detener el reconocimiento
           isWaitingForAnswerRef.current = false;
-          // Detener el reconocimiento temporalmente
+          
+          // Detener el reconocimiento de voz inmediatamente
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+              console.log('Reconocimiento de voz detenido');
+            } catch (e) {
+              console.error('Error al detener reconocimiento:', e);
+            }
+          }
+          
+          // Decir "Perfecto, leyendo rostro"
+          speak('Perfecto, leyendo rostro');
+          
+          // Disparar evento para activar reconocimiento facial DESPUÉS de que termine de hablar
+          setTimeout(() => {
+            console.log('🚀 Disparando evento activateFaceLogin');
+            window.dispatchEvent(new CustomEvent('activateFaceLogin'));
+          }, 1500); // Esperar a que termine de decir "Perfecto, leyendo rostro"
+          
+          return; // Salir temprano para no procesar más
+        } else if (isNo) {
+          console.log('❌ Usuario dijo NO');
+          isWaitingForAnswerRef.current = false;
+          
+          // Detener el reconocimiento de voz
           if (recognitionRef.current) {
             try {
               recognitionRef.current.stop();
@@ -110,30 +163,27 @@ export function useVirtualAssistant() {
               console.error('Error al detener reconocimiento:', e);
             }
           }
-          // Disparar evento para activar reconocimiento facial
+          
+          // Decir "Redirigiendo a la vista normal"
+          speak('Redirigiendo a la vista normal');
+          
+          // Asegurarse de que no haya usuario logueado antes de redirigir
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          
+          // Redirigir a /mirror después de que termine de hablar
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('activateFaceLogin'));
-          }, 300);
-        } else if (normalizedTranscript.includes('no') || 
-                   normalizedTranscript.includes('nop') ||
-                   normalizedTranscript.includes('cancelar')) {
-          console.log('❌ Usuario dijo no');
-          isWaitingForAnswerRef.current = false;
-          speak('De acuerdo, cuando estés listo di "quiero iniciar sesión"');
-          // Reiniciar el reconocimiento después de un momento
-          setTimeout(() => {
-            if (recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (e) {
-                console.error('Error al reiniciar reconocimiento:', e);
-              }
-            }
+            console.log('Redirigiendo a /mirror sin usuario logueado');
+            navigate('/mirror');
           }, 2000);
+          
+          return; // Salir temprano
         } else {
-          console.log('No se reconoció una respuesta válida, continuando escucha...');
+          // Si no es una respuesta válida, ignorar y continuar escuchando
+          console.log('⚠️ No se reconoció una respuesta válida (sí/no), ignorando y continuando escucha...');
+          console.log('Transcript recibido:', transcript);
+          return; // Continuar escuchando sin hacer nada
         }
-        return;
       }
 
       // Detectar comando para salir/logout (solo si estamos en el perfil)
@@ -308,7 +358,17 @@ export function useVirtualAssistant() {
   useEffect(() => {
     if (location.pathname === '/login' && !hasAskedLoginRef.current) {
       hasAskedLoginRef.current = true;
+      // Asegurarse de que NO estamos esperando respuesta inicialmente
       isWaitingForAnswerRef.current = false;
+      
+      // Detener cualquier reconocimiento activo antes de empezar
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Ignorar errores
+        }
+      }
       
       console.log('Llegamos a la página de login, preparando pregunta...');
       
@@ -317,22 +377,24 @@ export function useVirtualAssistant() {
         console.log('Haciendo pregunta: ¿Deseas iniciar sesión?');
         speak('¿Deseas iniciar sesión?');
         
-        // Esperar a que termine de hablar antes de activar el reconocimiento
+        // Esperar a que termine de hablar ANTES de activar el reconocimiento
         setTimeout(() => {
+          // PRIMERO establecer que estamos esperando respuesta
           isWaitingForAnswerRef.current = true;
-          console.log('Ahora estamos esperando respuesta del usuario');
+          console.log('✅ Ahora estamos esperando respuesta del usuario (isWaitingForAnswer = true)');
           
-          // Asegurarse de que el reconocimiento esté activo
+          // LUEGO esperar un momento adicional antes de iniciar el reconocimiento
+          // para asegurar que el flag esté establecido
           setTimeout(() => {
-            if (recognitionRef.current) {
+            if (recognitionRef.current && isWaitingForAnswerRef.current) {
               try {
-                console.log('Iniciando reconocimiento de voz...');
+                console.log('Iniciando reconocimiento de voz para escuchar respuesta...');
                 recognitionRef.current.start();
               } catch (e) {
                 console.error('Error al iniciar reconocimiento en login:', e);
                 // Intentar de nuevo después de un momento
                 setTimeout(() => {
-                  if (recognitionRef.current) {
+                  if (recognitionRef.current && isWaitingForAnswerRef.current) {
                     try {
                       recognitionRef.current.start();
                     } catch (e2) {
@@ -342,8 +404,8 @@ export function useVirtualAssistant() {
                 }, 1000);
               }
             }
-          }, 500);
-        }, 1500); // Esperar a que termine de hablar
+          }, 800); // Delay adicional para asegurar que el flag esté establecido
+        }, 2000); // Esperar más tiempo a que termine de hablar completamente
       }, 1000);
 
       return () => {

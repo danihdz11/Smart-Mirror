@@ -127,8 +127,17 @@ export default function Login() {
   useEffect(() => {
     console.log('Login: Configurando listener para activateFaceLogin');
     
+    let hasActivated = false; // Flag para evitar activaciones múltiples
+    
     const handleActivateFaceLogin = () => {
+      if (hasActivated) {
+        console.log('⚠️ Login: Ya se activó el reconocimiento facial, ignorando evento duplicado');
+        return;
+      }
+      
       console.log('✅ Login: Evento activateFaceLogin recibido, activando reconocimiento facial...');
+      hasActivated = true;
+      
       // Esperar un momento para asegurar que la cámara esté lista
       setTimeout(() => {
         console.log('Login: Ejecutando handleFaceLogin...');
@@ -142,6 +151,7 @@ export default function Login() {
     return () => {
       console.log('Login: Removiendo listener');
       window.removeEventListener('activateFaceLogin', handleActivateFaceLogin);
+      hasActivated = false;
     };
   }, [handleFaceLogin]);
 
