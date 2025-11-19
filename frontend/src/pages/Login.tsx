@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginWithFace } from "../services/api";
+import { loginWithFace, loginUser } from "../services/api";
 
 export default function Login() {
   const [isScanning, setIsScanning] = useState(false);
@@ -209,6 +209,7 @@ export default function Login() {
             Reiniciar cámara
           </button>
 
+
           {/* --- Login alterno con usuario y contraseña --- */}
           <div className="mt-10">
             <div className="flex items-center gap-4 mb-4">
@@ -218,15 +219,34 @@ export default function Login() {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                setError("");
+                setStatus("Iniciando sesión...");
+
                 const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value;
                 const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
 
-                // ⚠️ Aquí llamas tu backend real para login
-                // loginUser(email, password)
-                console.log("Intentando iniciar sesión con:", email, password);
+                try {
+                  // Llamar a la API usando tu api.ts
+                  const response = await loginUser({ email, password });
+
+                  // Guardar sesión
+                  localStorage.setItem("token", response.token);
+                  localStorage.setItem("user", JSON.stringify(response.user));
+
+                  setStatus(`¡Bienvenido, ${response.user.name}!`);
+
+                  // Redirigir a /mirror
+                  setTimeout(() => navigate("/mirror"), 1200);
+
+                } catch (err: any) {
+                  console.error(err);
+                  setError(err.response?.data?.message || "Credenciales incorrectas");
+                  setStatus("");
+                }
               }}
+
               className="flex flex-col gap-4"
             >
               <input
