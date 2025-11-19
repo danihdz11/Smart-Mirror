@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { registerUser } from "../services/api";
 
 interface RegisterFormData {
@@ -22,6 +23,9 @@ export default function Register() {
   const [faceFile, setFaceFile] = useState<File | null>(null);
   const [facePreview, setFacePreview] = useState<string | null>(null);
   const [faceError, setFaceError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -198,11 +202,23 @@ export default function Register() {
             Registrarme
           </button>
         </form>
+
+
+
+        <button
+          type="button"
+          onClick={() => navigate("/login")}
+          className="mt-4 w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition"
+        >
+          Ya tengo cuenta — Iniciar sesión
+        </button>
+
+
+
       </div>
     </div>
   );
 }
-
 
 
 
