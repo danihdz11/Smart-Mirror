@@ -54,6 +54,12 @@ export const pool = mysql.createPool({
     const [rows] = await pool.query("SELECT 1 AS ok;");
     console.log("Conexión MySQL OK:", rows);
 
+    const [sensors] = await pool.query('SELECT * FROM sensors;');
+    console.log("Información del sensor", sensors);
+
+    const [data] = await pool.query('SELECT * FROM data;');
+    console.log("Información de la tabla data", data);
+
   } catch (err) {
     console.error("Error conectando a MySQL:", err.message);
   }

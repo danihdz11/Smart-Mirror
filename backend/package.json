@@ -18,6 +18,7 @@
     "express": "^5.1.0",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
+    "magic-home": "^2.9.0",
     "mongoose": "^8.19.1",
     "mqtt": "^5.14.1",
     "multer": "^1.4.5-lts.1",
