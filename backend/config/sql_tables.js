@@ -50,6 +50,11 @@ try {
   const [rows] = await pool.query("SELECT 1 AS ok;");
   console.log("Conexión OK:", rows);
 
+  await pool.query(`DROP TABLE IF EXISTS data;`);
+  await pool.query(`DROP TABLE IF EXISTS sensors;`);
+
+  console.log("Tables dropped");
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sensors (
       id INT AUTO_INCREMENT PRIMARY KEY,
