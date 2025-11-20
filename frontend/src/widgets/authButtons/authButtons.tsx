@@ -44,13 +44,13 @@ export default function AuthButtons() {
         <>
           <button
             onClick={() => navigate("/login")}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+            className="px-3 py-1.5 text-sm font-medium text-[#FDEBD8] bg-[#928779] rounded-lg hover:bg-blue-700 transition-all shadow-sm"
           >
             Login
           </button>
           <button
             onClick={() => navigate("/register")}
-            className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-lg hover:bg-blue-50 transition-all shadow-sm"
+            className="px-3 py-1.5 text-sm font-medium text-[#928779]-600 bg-[#FDEBD8] border border-[#928779] rounded-lg hover:bg-blue-50 transition-all shadow-sm"
           >
             Sign Up
           </button>
