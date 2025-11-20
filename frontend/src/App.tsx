@@ -35,21 +35,23 @@ function App() {
           element={
             <MirrorView>
               <AuthButtons />
-              <div className="absolute top-6 left-6 pointer-events-auto">
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-auto">
                 <ClockWidget />
               </div>
 
-              {/* Calendario (izquierda) */}
+              {/* Calendario y Noticias(izquierda) */}
+              <div className="absolute top-6 left-6 pointer-events-auto">
+                <NewsWidget />
+              </div>
               <div className="absolute bottom-6 left-6 pointer-events-auto">
                 <MiniCalendar />
               </div>
 
               {/* Widgets derechos */}
-              <div className="absolute top-6 right-6 flex flex-col gap-4 pointer-events-auto">
+              <div className="absolute top-16 right-6 flex flex-col gap-4 items-end pointer-events-auto">
                 <WeatherWidget />
                 <ToDoWidget refresh={refreshTasks}/>
-                <QuoteWidget />
-                <NewsWidget />
+                {/* <QuoteWidget /> */}
               </div>
 
               {/* <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
