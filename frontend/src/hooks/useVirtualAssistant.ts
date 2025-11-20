@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { transcribeAudio } from '../services/api';
+import { transcribeAudio, synthesizeSpeech } from '../services/api';
 
 export function useVirtualAssistant() {
   const navigate = useNavigate();
@@ -441,10 +441,54 @@ export function useVirtualAssistant() {
     isProcessingRef.current = false;
   };
 
-  // Función para hablar
-  const speak = (text: string) => {
+  // Función para hablar usando el backend (más confiable en Raspberry Pi)
+  const speak = async (text: string): Promise<void> => {
+    if (!text || text.trim().length === 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+      (async () => {
+        try {
+          // Intentar primero con el backend (usa el sistema de audio del OS, igual que YouTube)
+          console.log('Generando audio con backend TTS...');
+          const audioBlob = await synthesizeSpeech(text, 'es');
+          
+          // Crear URL del blob y reproducirlo
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          
+          audio.onended = () => {
+            console.log('Terminó de hablar');
+            // Liberar la URL del blob después de reproducir
+            URL.revokeObjectURL(audioUrl);
+            resolve();
+          };
+          
+          audio.onerror = (error) => {
+            console.error('Error al reproducir audio:', error);
+            URL.revokeObjectURL(audioUrl);
+            // Fallback a speechSynthesis si falla
+            fallbackToSpeechSynthesisWithCallback(text, resolve);
+          };
+          
+          // Reproducir el audio
+          await audio.play();
+          
+        } catch (error) {
+          console.error('Error al generar audio con backend, usando fallback:', error);
+          // Fallback a speechSynthesis si el backend falla
+          fallbackToSpeechSynthesisWithCallback(text, resolve);
+        }
+      })();
+    });
+  };
+
+  // Fallback a speechSynthesis del navegador (por si el backend falla)
+  const fallbackToSpeechSynthesisWithCallback = (text: string, callback?: () => void) => {
     if (!('speechSynthesis' in window)) {
-      console.warn('Tu navegador no soporta síntesis de voz');
+      console.warn('Tu navegador no soporta síntesis de voz y el backend falló');
+      if (callback) callback();
       return;
     }
 
@@ -465,7 +509,8 @@ export function useVirtualAssistant() {
     }
 
     utterance.onend = () => {
-      console.log('Terminó de hablar');
+      console.log('Terminó de hablar (usando fallback)');
+      if (callback) callback();
     };
 
     window.speechSynthesis.speak(utterance);
@@ -491,7 +536,7 @@ export function useVirtualAssistant() {
         return;
       }
       
-      setTimeout(() => {
+      setTimeout(async () => {
         let newsText = 'Aquí están las noticias del día. ';
         
         articles.forEach((article: any, index: number) => {
@@ -501,35 +546,21 @@ export function useVirtualAssistant() {
         });
         
         newsText += 'Eso es todo por ahora.';
-        
+
         console.log('Leyendo noticias:', newsText);
         
-        const utterance = new SpeechSynthesisUtterance(newsText);
-        utterance.lang = 'es-MX';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
+        // Usar la función speak() que ahora usa el backend
+        await speak(newsText);
         
-        const voices = window.speechSynthesis.getVoices();
-        const spanishVoice = voices.find(voice => 
-          voice.lang.includes('es') || voice.lang.includes('ES')
-        );
-        if (spanishVoice) {
-          utterance.voice = spanishVoice;
-        }
+        // Cuando termine de hablar, reiniciar el listening
+        console.log('Terminó de leer las noticias');
+        isReadingNewsRef.current = false;
         
-        utterance.onend = () => {
-          console.log('Terminó de leer las noticias');
-          isReadingNewsRef.current = false;
-          
-          setTimeout(() => {
-            if (location.pathname === '/mirror') {
-              startListening();
-            }
-          }, 1000);
-        };
-        
-        window.speechSynthesis.speak(utterance);
+        setTimeout(() => {
+          if (location.pathname === '/mirror') {
+            startListening();
+          }
+        }, 1000);
       }, 2000);
       
     } catch (error) {

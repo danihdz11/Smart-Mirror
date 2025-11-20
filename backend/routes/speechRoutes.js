@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { transcribeAudio } from "../controllers/speechController.js";
+import { transcribeAudio, synthesizeSpeech } from "../controllers/speechController.js";
 
 const router = express.Router();
 
@@ -39,6 +39,9 @@ const upload = multer({
 
 // Endpoint para transcribir audio
 router.post("/transcribe", upload.single("audio"), transcribeAudio);
+
+// Endpoint para sintetizar texto a voz
+router.post("/synthesize", synthesizeSpeech);
 
 export default router;
 

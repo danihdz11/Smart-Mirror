@@ -296,3 +296,145 @@ except Exception as e:
   }
 };
 
+/**
+ * Sintetiza texto a voz usando espeak o pico2wave
+ * Esta función genera audio que funciona igual que YouTube (sistema de audio del OS)
+ */
+export const synthesizeSpeech = async (req, res) => {
+  try {
+    const { text, lang = 'es' } = req.body;
+
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ error: 'El texto es requerido' });
+    }
+
+    // Directorio temporal para guardar el audio
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const audioFileName = `tts_${Date.now()}.wav`;
+    const audioFilePath = path.join(tempDir, audioFileName);
+
+    try {
+      // Intentar primero con pico2wave (mejor calidad, especialmente en español)
+      // pico2wave está disponible en Raspberry Pi OS
+      try {
+        await execAsync(`pico2wave -l ${lang}-ES -w "${audioFilePath}" "${text}"`);
+        
+        // Verificar que el archivo se creó correctamente
+        if (fs.existsSync(audioFilePath)) {
+          const stats = fs.statSync(audioFilePath);
+          if (stats.size > 0) {
+            console.log(`✅ Audio generado con pico2wave: ${audioFilePath}`);
+            
+            // Enviar el archivo de audio
+            res.setHeader('Content-Type', 'audio/wav');
+            res.setHeader('Content-Disposition', `inline; filename="${audioFileName}"`);
+            
+            const audioBuffer = fs.readFileSync(audioFilePath);
+            res.send(audioBuffer);
+            
+            // Limpiar archivo después de un delay (para asegurar que se envió)
+            setTimeout(() => {
+              try {
+                if (fs.existsSync(audioFilePath)) {
+                  fs.unlinkSync(audioFilePath);
+                }
+              } catch (cleanupError) {
+                console.error('Error al limpiar archivo de audio:', cleanupError);
+              }
+            }, 1000);
+            
+            return;
+          }
+        }
+      } catch (picoError) {
+        console.log('pico2wave no disponible, intentando con espeak...');
+        // Si pico2wave falla, continuar con espeak
+      }
+
+      // Fallback a espeak (disponible en la mayoría de sistemas Linux)
+      // espeak -s velocidad -v idioma texto -w archivo_salida
+      // -s 150 = velocidad normal
+      // -v es = español, -v es-es = español de España, etc.
+      const espeakLang = lang === 'es' ? 'es' : lang;
+      await execAsync(`espeak -s 150 -v ${espeakLang} "${text}" -w "${audioFilePath}"`);
+      
+      // Verificar que el archivo se creó correctamente
+      if (fs.existsSync(audioFilePath)) {
+        const stats = fs.statSync(audioFilePath);
+        if (stats.size > 0) {
+          console.log(`✅ Audio generado con espeak: ${audioFilePath}`);
+          
+          // Enviar el archivo de audio
+          res.setHeader('Content-Type', 'audio/wav');
+          res.setHeader('Content-Disposition', `inline; filename="${audioFileName}"`);
+          
+          const audioBuffer = fs.readFileSync(audioFilePath);
+          res.send(audioBuffer);
+          
+          // Limpiar archivo después de un delay
+          setTimeout(() => {
+            try {
+              if (fs.existsSync(audioFilePath)) {
+                fs.unlinkSync(audioFilePath);
+              }
+            } catch (cleanupError) {
+              console.error('Error al limpiar archivo de audio:', cleanupError);
+            }
+          }, 1000);
+          
+          return;
+        }
+      }
+
+      // Si llegamos aquí, ninguno funcionó
+      throw new Error('No se pudo generar el audio con ningún motor TTS');
+
+    } catch (ttsError) {
+      // Limpiar archivo si existe
+      try {
+        if (fs.existsSync(audioFilePath)) {
+          fs.unlinkSync(audioFilePath);
+        }
+      } catch (cleanupError) {
+        // Ignorar errores de limpieza
+      }
+
+      const errorMsg = ttsError.message || '';
+      console.error('Error al generar audio TTS:', errorMsg);
+
+      // Dar instrucciones de instalación según el sistema
+      const isWindows = process.platform === 'win32';
+      const isLinux = process.platform === 'linux';
+
+      if (isLinux) {
+        return res.status(500).json({ 
+          error: 'No se encontró un motor TTS instalado. Instala uno con: sudo apt-get install espeak espeak-data libttspico-utils',
+          details: errorMsg,
+          suggestion: 'Para mejor calidad en español: sudo apt-get install libttspico-utils'
+        });
+      } else if (isWindows) {
+        return res.status(500).json({ 
+          error: 'TTS no disponible en Windows. Considera usar speechSynthesis del navegador o instalar un motor TTS.',
+          details: errorMsg
+        });
+      } else {
+        return res.status(500).json({ 
+          error: 'No se pudo generar el audio. Asegúrate de tener un motor TTS instalado.',
+          details: errorMsg
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Error en synthesizeSpeech:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message 
+    });
+  }
+};
+

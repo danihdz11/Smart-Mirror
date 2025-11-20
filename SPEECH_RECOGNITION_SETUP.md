@@ -48,7 +48,34 @@ Este documento explica cómo configurar el reconocimiento de voz que funciona en
    ffmpeg -version
    ```
 
-4. **Verificar que el micrófono funcione:**
+4. **Instalar motor de síntesis de voz (TTS):**
+   
+   **En Raspberry Pi/Linux (recomendado para mejor calidad en español):**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y libttspico-utils espeak espeak-data
+   ```
+   
+   **Nota:** `pico2wave` (parte de `libttspico-utils`) ofrece mejor calidad en español que `espeak`.
+   
+   **Solo con espeak (alternativa más ligera):**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y espeak espeak-data
+   ```
+   
+   **Verificar instalación:**
+   ```bash
+   # Probar pico2wave (mejor calidad)
+   pico2wave -l es-ES -w test.wav "Hola, esto es una prueba"
+   aplay test.wav
+   
+   # O probar espeak (alternativa)
+   espeak -s 150 -v es "Hola, esto es una prueba" -w test.wav
+   aplay test.wav
+   ```
+
+5. **Verificar que el micrófono funcione:**
    ```bash
    arecord -l  # Listar dispositivos de audio
    arecord -d 5 test.wav  # Grabar 5 segundos de audio
@@ -120,6 +147,30 @@ Instala las dependencias de Python:
 pip3 install speechrecognition pydub
 ```
 
+### Error: "No se encontró un motor TTS instalado"
+
+Si escuchas que el asistente habla pero no se reproduce el audio (especialmente en Raspberry Pi), necesitas instalar un motor TTS:
+
+**Para mejor calidad en español (recomendado):**
+```bash
+sudo apt-get update
+sudo apt-get install -y libttspico-utils
+```
+
+**Alternativa más ligera:**
+```bash
+sudo apt-get update
+sudo apt-get install -y espeak espeak-data
+```
+
+**Verificar que funciona:**
+```bash
+pico2wave -l es-ES -w test.wav "Prueba de audio"
+aplay test.wav  # Deberías escuchar el audio por los audífonos
+```
+
+Si `aplay` funciona pero el asistente no, verifica que el backend esté corriendo y que el frontend esté conectado correctamente.
+
 ### El reconocimiento no funciona correctamente
 
 1. **Verificar que el audio se esté grabando:**
@@ -158,4 +209,13 @@ pip3 install speechrecognition pydub
 3. **API Service:**
    - Nueva función `transcribeAudio()` en `api.ts`
    - Envía el audio al backend para transcripción
+   - Nueva función `synthesizeSpeech()` en `api.ts`
+   - Envía texto al backend para generar audio
+
+4. **Síntesis de Voz (TTS):**
+   - El asistente ahora usa el backend para generar audio con TTS
+   - Usa `pico2wave` o `espeak` en lugar de `speechSynthesis` del navegador
+   - Esto soluciona el problema de audio en Raspberry Pi donde `speechSynthesis` no funciona
+   - El audio se reproduce igual que YouTube (usa el sistema de audio del OS)
+   - Fallback automático a `speechSynthesis` del navegador si el backend falla
 

@@ -85,3 +85,16 @@ export const transcribeAudio = async (audioBlob: Blob, lang: string = "es-MX"): 
   });
   return res.data;
 };
+
+// Text-to-Speech API
+export const synthesizeSpeech = async (text: string, lang: string = "es"): Promise<Blob> => {
+  const res = await axios.post(
+    `${API_URL}/speech/synthesize`,
+    { text, lang },
+    {
+      responseType: 'blob', // Importante: recibir como blob para el audio
+      timeout: 10000, // 10 segundos timeout
+    }
+  );
+  return res.data;
+};
