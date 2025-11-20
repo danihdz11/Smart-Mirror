@@ -74,7 +74,7 @@ export default function Register() {
 
       // Solo guardamos los datos del usuario
       const res = await registerUser(formData, faceFile);
-      alert(res.message || "Usuario registrado correctamente");
+      alert(res.message || "Inicia Sesión en la Pantalla de Login");
       console.log("✅ Respuesta:", res);
 
       // Reset form después del registro
