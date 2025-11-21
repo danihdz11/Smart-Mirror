@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { pool } from "./sql_db.js";
 import { createRequire } from "module";
+import { exec } from "child_process";
 
 // Para usar libs CommonJS (magic-home) en ES Modules
 const require = createRequire(import.meta.url);
@@ -28,32 +29,57 @@ if (!MQTT_URL) {
 }
 
 // =============================
+// 🔊 TTS MULTIPLATAFORMA
+// =============================
+const isMac = process.platform === "darwin";
+const isLinux = process.platform === "linux";
+
+function decir(texto) {
+  const seguro = texto.replace(/"/g, '\\"');
+  let comando;
+
+  if (isMac) {
+    comando = `say "${seguro}"`; // macOS
+  } else if (isLinux) {
+    comando = `espeak -v es-mx "${seguro}"`; // Raspberry Pi
+  } else {
+    console.log("🔊 (Simulado) Diría por bocina:", texto);
+    return;
+  }
+
+  exec(comando, (error) => {
+    if (error) {
+      console.error("❌ Error al reproducir voz:", error.message);
+    } else {
+      console.log("🔊 Dije por bocina:", texto);
+    }
+  });
+}
+
+// =============================
 // 🔦 CONFIG MAGIC HOME
 // =============================
-
-// Tu ID de dispositivo Magic Home (en minúsculas)
-const TARGET_ID = "b4e8422c1fe4"; // <-- ajusta si cambia
+const TARGET_ID = "b4e8422c1fe4"; // <-- Ajusta si cambia
 
 let ledEncendida = false;
 let light = null;
 
-// Últimos valores de sensores
-let ultimoValorLDR = 50; // %
+// Valores recientes
+let ultimoValorLDR = 50;
 let ultimoValorPIR = 0;
 
-// Convierte 0–100 → 0–255 de brillo (invirtiendo: más luz ambiente → menos brillo del foco)
+// Convierte 0–100 → 0–255 (invirtiendo)
 function brilloA255(valor) {
-  let brillo = 100 - Number(valor); // más luz → menos brillo de foco
-  brillo = Math.max(0, Math.min(brillo, 100)); // clamp 0–100
+  let brillo = 100 - Number(valor);
+  brillo = Math.max(0, Math.min(brillo, 100));
   return Math.floor((brillo / 100) * 255);
 }
 
-// Busca el controlador Magic Home en la red
+// Busca Magic Home en la red
 async function encontrarDispositivo() {
   const discovery = new Discovery();
   console.log("🔍 Buscando dispositivo Magic Home…");
 
-  // API moderna: devuelve promesa
   const devices = await discovery.scan(5000);
 
   if (!devices || devices.length === 0) {
@@ -62,7 +88,6 @@ async function encontrarDispositivo() {
 
   console.log("📡 Dispositivos detectados:", devices);
 
-  // Buscar por ID
   const target = devices.find(
     (d) => (d.id || "").toLowerCase() === TARGET_ID
   );
@@ -78,32 +103,36 @@ async function encontrarDispositivo() {
   return chosen.address;
 }
 
-// Encendido/apagado y brillo con datos de sensores
+// Encendido/apagado con voz
 async function manejarDatos(triggerPIR, valorLDR) {
   console.log("📥 Datos para LED:", { triggerPIR, valorLDR });
 
   if (!light) {
-    console.log("⚠️ La luz aún no está lista (no se encontró el dispositivo).");
+    console.log("⚠️ La luz aún no está lista.");
     return;
   }
 
   const trigger = Number(triggerPIR);
 
-  // Solo reaccionamos cuando PIR manda 1 → toggle
   if (trigger === 1) {
     if (!ledEncendida) {
       // 🔥 ENCENDER
       const brightness = brilloA255(valorLDR);
       console.log("💡 Encendiendo LED con brillo:", brightness);
 
-      // Luz cálida (255, 160, 60)
       await light.setColorWithBrightness(255, 160, 60, brightness);
       ledEncendida = true;
+
+      // 🔊 Voz
+      decir("Di Log in para iniciar sesión");
     } else {
       // ❌ APAGAR
       console.log("⛔ Apagando LED…");
       await light.turnOff();
       ledEncendida = false;
+
+      // 🔊 Voz
+      decir("Adios vuelve pronto");
     }
   }
 }
@@ -115,19 +144,16 @@ async function inicializarLED() {
     light = new Control(ip);
     console.log("🚀 LED lista en IP:", ip);
 
-    // Opcional: apagar al inicio
+    // Apagar al inicio
     try {
       await light.turnOff();
       ledEncendida = false;
       console.log("🔧 LED apagada al inicio.");
     } catch (e) {
-      console.warn("⚠️ No se pudo apagar la luz al inicio:", e.message);
+      console.warn("⚠️ No se pudo apagar al inicio:", e.message);
     }
   } catch (err) {
-    console.error(
-      "❌ Error inicializando LED:",
-      err instanceof Error ? err.message : err
-    );
+    console.error("❌ Error inicializando LED:", err.message);
   }
 }
 
@@ -147,7 +173,7 @@ async function getSensorIdByName(name) {
   );
 
   if (rows.length === 0) {
-    throw new Error(`No se encontró sensor con name='${name}' en la tabla sensors`);
+    throw new Error(`No se encontró sensor con name='${name}'`);
   }
 
   const id = rows[0].id;
@@ -179,8 +205,7 @@ client.on("error", (err) => {
   console.error("❌ MQTT error:", err.message);
 });
 
-// Mapear topics → nombre en tabla sensors
-// En tu BD tienes: 'caja/porcentaje' (ldr) y 'caja/movimiento' (pir)
+// Mapear topics → sensor name
 const TOPIC_TO_SENSOR_NAME = {
   [MQTT_TOPIC_LDR]: "caja/porcentaje",
   [MQTT_TOPIC_PIR]: "caja/movimiento",
@@ -192,17 +217,17 @@ client.on("message", async (topic, message) => {
 
   const value = parseFloat(payload);
   if (Number.isNaN(value)) {
-    console.warn("⚠️ Mensaje no numérico, no se inserta en la BD:", payload);
+    console.warn("⚠️ Mensaje no numérico:", payload);
     return;
   }
 
   const sensorName = TOPIC_TO_SENSOR_NAME[topic];
   if (!sensorName) {
-    console.warn("⚠️ Topic recibido sin mapeo en TOPIC_TO_SENSOR_NAME:", topic);
+    console.warn("⚠️ Topic sin mapeo:", topic);
     return;
   }
 
-  // 💾 Guardar en BD
+  // Guardar en BD
   try {
     const sensorId = await getSensorIdByName(sensorName);
 
@@ -218,20 +243,14 @@ client.on("message", async (topic, message) => {
     console.error("❌ Error al guardar en BD:", err.message);
   }
 
-  // =============================
-  // 🔦 LÓGICA DE LED (Magic Home)
-  // =============================
+  // Lógica LED + voz
   try {
     if (topic === MQTT_TOPIC_LDR) {
-      // Actualizamos último valor de LDR (porcentaje de luz)
       ultimoValorLDR = value;
     }
 
     if (topic === MQTT_TOPIC_PIR) {
-      // PIR manda 0 o 1 → lo usamos como trigger
       ultimoValorPIR = value;
-
-      // Usamos el último LDR conocido para el brillo
       manejarDatos(ultimoValorPIR, ultimoValorLDR).catch((e) =>
         console.error("⚠️ Error en manejarDatos:", e.message)
       );
