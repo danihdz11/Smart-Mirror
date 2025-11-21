@@ -26,6 +26,7 @@ export function useVirtualAssistant() {
     console.log('Confianza:', confidence);
     console.log('¿Estamos esperando respuesta?', isWaitingForAnswerRef.current);
     console.log('¿Estamos en login?', location.pathname === '/login');
+    console.log('📍 location.pathname actual:', location.pathname);
     
     // Si la confianza es muy baja, ignorar (probablemente ruido)
     if (confidence > 0 && confidence < 0.3) {
@@ -33,8 +34,9 @@ export function useVirtualAssistant() {
       return;
     }
 
-    // Si estamos en la página de login y estamos esperando respuesta
-    if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
+    // Si estamos esperando respuesta (esto solo se activa en login)
+    // Usamos el flag como indicador principal ya que es más confiable que location.pathname
+    if (isWaitingForAnswerRef.current) {
       console.log('🔍 Procesando respuesta en login:', normalizedTranscript);
       console.log('Longitud del transcript:', normalizedTranscript.length);
       
@@ -112,16 +114,25 @@ export function useVirtualAssistant() {
       
       if (isYes) {
         console.log('✅✅✅ Usuario dijo SÍ claramente, activando reconocimiento facial...');
+        
+        // Verificar que realmente estamos esperando respuesta antes de activar
+        if (!isWaitingForAnswerRef.current) {
+          console.log('⚠️ No estábamos esperando respuesta, ignorando...');
+          return;
+        }
+        
+        // Desactivar el flag inmediatamente para evitar múltiples activaciones
         isWaitingForAnswerRef.current = false;
         
         stopListening();
         
         speak('Perfecto, leyendo tu rostro');
         
+        // Esperar a que termine de hablar antes de activar el reconocimiento facial
         setTimeout(() => {
           console.log('🚀 Disparando evento activateFaceLogin');
           window.dispatchEvent(new CustomEvent('activateFaceLogin'));
-        }, 1500);
+        }, 2000); // Aumentar el tiempo para asegurar que termine de hablar
         
         return;
       } else if (isNo) {
@@ -463,6 +474,19 @@ export function useVirtualAssistant() {
             // Liberar la URL del blob después de reproducir
             URL.revokeObjectURL(audioUrl);
             resolve();
+            
+            // Reiniciar listening automáticamente si estamos en /mirror y logueados
+            // (excepto si estamos leyendo noticias o esperando respuesta en login)
+            const user = localStorage.getItem('user');
+            if (user && location.pathname === '/mirror' && 
+                !isReadingNewsRef.current && 
+                !isProcessingRef.current &&
+                !isWaitingForAnswerRef.current) {
+              setTimeout(() => {
+                console.log('Reiniciando listening después de hablar...');
+                startListening();
+              }, 500);
+            }
           };
           
           audio.onerror = (error) => {
@@ -511,6 +535,19 @@ export function useVirtualAssistant() {
     utterance.onend = () => {
       console.log('Terminó de hablar (usando fallback)');
       if (callback) callback();
+      
+      // Reiniciar listening automáticamente si estamos en /mirror y logueados
+      // (excepto si estamos leyendo noticias o esperando respuesta en login)
+      const user = localStorage.getItem('user');
+      if (user && location.pathname === '/mirror' && 
+          !isReadingNewsRef.current && 
+          !isProcessingRef.current &&
+          !isWaitingForAnswerRef.current) {
+        setTimeout(() => {
+          console.log('Reiniciando listening después de hablar (fallback)...');
+          startListening();
+        }, 500);
+      }
     };
 
     window.speechSynthesis.speak(utterance);
@@ -615,20 +652,23 @@ export function useVirtualAssistant() {
       
       console.log('Llegamos a la página de login, preparando pregunta...');
       
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         console.log('Haciendo pregunta: ¿Deseas iniciar sesión?');
-        speak('¿Deseas iniciar sesión? Responde sí para leer tu rostro, o no para continuar sin iniciar sesión');
         
+        // Esperar a que termine de hablar antes de activar el listening
+        await speak('¿Deseas iniciar sesión? Responde sí para leer tu rostro, o no para continuar sin iniciar sesión');
+        
+        // Solo después de que termine de hablar, activar el flag y empezar a escuchar
+        isWaitingForAnswerRef.current = true;
+        console.log('✅ Ahora estamos esperando respuesta del usuario');
+        
+        // Esperar un momento adicional antes de empezar a escuchar
         setTimeout(() => {
-          isWaitingForAnswerRef.current = true;
-          console.log('✅ Ahora estamos esperando respuesta del usuario');
-          
-          setTimeout(() => {
-            if (isWaitingForAnswerRef.current) {
-              startListening();
-            }
-          }, 4000); // Dar más tiempo para que termine de hablar
-        }, 2000);
+          if (isWaitingForAnswerRef.current && location.pathname === '/login') {
+            console.log('🎤 Iniciando listening para recibir respuesta...');
+            startListening();
+          }
+        }, 1000);
       }, 1000);
 
       return () => {
@@ -655,10 +695,8 @@ export function useVirtualAssistant() {
           const timer = setTimeout(() => {
             hasWelcomedToProfileRef.current = true;
             speak(`Bienvenido ${userName}, dime, ¿en qué te puedo ayudar hoy?`);
-            
-            setTimeout(() => {
-              startListening();
-            }, 2000);
+            // El listening se reiniciará automáticamente cuando termine de hablar
+            // (manejado en la función speak)
           }, 1000);
 
           return () => {

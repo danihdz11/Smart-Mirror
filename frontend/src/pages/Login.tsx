@@ -127,16 +127,23 @@ export default function Login() {
   useEffect(() => {
     console.log('Login: Configurando listener para activateFaceLogin');
     
-    let hasActivated = false; // Flag para evitar activaciones múltiples
+    const hasActivatedRef = { current: false }; // Usar ref para persistir entre renders
     
-    const handleActivateFaceLogin = () => {
-      if (hasActivated) {
+    const handleActivateFaceLogin = (event: Event) => {
+      // Verificar que el evento sea válido y no se haya activado ya
+      if (hasActivatedRef.current) {
         console.log('⚠️ Login: Ya se activó el reconocimiento facial, ignorando evento duplicado');
         return;
       }
       
+      // Verificar que no estemos escaneando ya
+      if (isScanning) {
+        console.log('⚠️ Login: Ya se está escaneando, ignorando evento');
+        return;
+      }
+      
       console.log('✅ Login: Evento activateFaceLogin recibido, activando reconocimiento facial...');
-      hasActivated = true;
+      hasActivatedRef.current = true;
       
       // Esperar un momento para asegurar que la cámara esté lista
       setTimeout(() => {
@@ -151,9 +158,9 @@ export default function Login() {
     return () => {
       console.log('Login: Removiendo listener');
       window.removeEventListener('activateFaceLogin', handleActivateFaceLogin);
-      hasActivated = false;
+      hasActivatedRef.current = false;
     };
-  }, [handleFaceLogin]);
+  }, [handleFaceLogin, isScanning]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
