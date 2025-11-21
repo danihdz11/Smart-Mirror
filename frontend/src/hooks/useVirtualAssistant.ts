@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { transcribeAudio, synthesizeSpeech } from '../services/api';
+import { useMirrorCommands } from './useMirrorCommands';
 
 export function useVirtualAssistant() {
   const navigate = useNavigate();
@@ -12,11 +13,12 @@ export function useVirtualAssistant() {
   const hasGreetedRef = useRef(false);
   const hasAskedLoginRef = useRef(false);
   const isWaitingForAnswerRef = useRef(false);
-  const hasWelcomedToProfileRef = useRef(false);
-  const isReadingNewsRef = useRef(false);
   const isProcessingRef = useRef(false);
   const recordingIntervalRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
+  const processLoggedInCommandRef = useRef<((transcript: string) => boolean) | null>(null);
+  const isReadingNewsRef = useRef(false);
+  const hasWelcomedToProfileRef = useRef(false);
 
   // Función para procesar el transcript
   const processTranscript = (transcript: string, confidence: number = 1.0) => {
@@ -160,54 +162,10 @@ export function useVirtualAssistant() {
       }
     }
 
-    // Detectar comando para salir/logout (solo si estamos en el perfil)
-    if (location.pathname === '/mirror') {
-      const normalized = normalizedTranscript.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      
-      // Detectar comando para leer noticias
-      if (!isReadingNewsRef.current && 
-          (normalized.includes('dime las noticias') || 
-           normalized.includes('dime las noticia') ||
-           normalized.includes('lee las noticias') ||
-           normalized.includes('lee las noticia') ||
-           normalized.includes('cuéntame las noticias') ||
-           normalized.includes('cuentame las noticias'))) {
-        console.log('Usuario pidió leer las noticias...');
-        
-        isReadingNewsRef.current = true;
-        
-        stopListening();
-        
-        fetchNewsAndRead();
-        
-        return;
-      }
-      
-      if (normalized.includes('salir') || 
-          normalized.includes('cerrar sesion') ||
-          normalized.includes('cerrar sesión') ||
-          normalized.includes('logout') ||
-          normalized.includes('desconectar')) {
-        console.log('Usuario pidió salir, ejecutando logout...');
-        
-        stopListening();
-        
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        
-        window.dispatchEvent(new CustomEvent('userLogout'));
-        
-        hasWelcomedToProfileRef.current = false;
-        hasGreetedRef.current = false;
-        
-        speak('Sesión cerrada. Hasta luego.');
-        
-        setTimeout(() => {
-          hasGreetedRef.current = false;
-          startListening();
-        }, 3000);
-        
-        return;
+    // Procesar comandos cuando el usuario está logueado (delegar al hook useMirrorCommands)
+    if (processLoggedInCommandRef.current) {
+      if (processLoggedInCommandRef.current(transcript)) {
+        return; // El comando fue procesado, no continuar
       }
     }
 
@@ -554,61 +512,23 @@ export function useVirtualAssistant() {
     synthesisRef.current = window.speechSynthesis;
   };
 
-  // Función para obtener y leer las noticias del widget
-  const fetchNewsAndRead = async () => {
-    try {
-      console.log('Obteniendo noticias del widget...');
-      speak('Obteniendo las noticias del día');
-      
-      const response = await fetch('http://localhost:5001/api/news');
-      const data = await response.json();
-      const articles = (data?.data || []).slice(0, 5);
-      
-      if (articles.length === 0) {
-        speak('Lo siento, no pude obtener las noticias en este momento');
-        setTimeout(() => {
-          isReadingNewsRef.current = false;
-          startListening();
-        }, 2000);
-        return;
-      }
-      
-      setTimeout(async () => {
-        let newsText = 'Aquí están las noticias del día. ';
-        
-        articles.forEach((article: any, index: number) => {
-          const title = article.title || 'Sin título';
-          const source = article.source?.name || 'Fuente desconocida';
-          newsText += `Noticia ${index + 1}: ${title}. Fuente: ${source}. `;
-        });
-        
-        newsText += 'Eso es todo por ahora.';
+  // Inicializar el hook de comandos para usuarios logueados
+  // Esto debe estar después de definir speak, startListening y stopListening
+  const mirrorCommands = useMirrorCommands({
+    speak,
+    startListening,
+    stopListening,
+    isProcessingRef,
+  });
 
-        console.log('Leyendo noticias:', newsText);
-        
-        // Usar la función speak() que ahora usa el backend
-        await speak(newsText);
-        
-        // Cuando termine de hablar, reiniciar el listening
-        console.log('Terminó de leer las noticias');
-        isReadingNewsRef.current = false;
-        
-        setTimeout(() => {
-          if (location.pathname === '/mirror') {
-            startListening();
-          }
-        }, 1000);
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Error al obtener noticias:', error);
-      speak('Lo siento, no pude obtener las noticias en este momento');
-      setTimeout(() => {
-        isReadingNewsRef.current = false;
-        startListening();
-      }, 2000);
-    }
-  };
+  // Actualizar las referencias para usar en otras partes del código
+  // Nota: Estas referencias se actualizan en cada render para mantener la sincronización
+  processLoggedInCommandRef.current = mirrorCommands.processLoggedInCommand;
+  
+  // Sincronizar las referencias compartidas en cada render
+  // Esto asegura que las referencias locales estén actualizadas cuando se usen en las funciones
+  isReadingNewsRef.current = mirrorCommands.isReadingNewsRef.current;
+  hasWelcomedToProfileRef.current = mirrorCommands.hasWelcomedToProfileRef.current;
 
   // Limpiar recursos al desmontar
   useEffect(() => {
@@ -680,36 +600,7 @@ export function useVirtualAssistant() {
     }
   }, [location.pathname]);
 
-  // Cuando el usuario entra a su perfil
-  useEffect(() => {
-    if (location.pathname === '/mirror') {
-      const userFromStorage = localStorage.getItem('user');
-      
-      if (userFromStorage && !hasWelcomedToProfileRef.current) {
-        try {
-          const user = JSON.parse(userFromStorage);
-          const userName = user.name || 'Usuario';
-          
-          console.log(`Usuario ${userName} entró a su perfil, saludando...`);
-          
-          const timer = setTimeout(() => {
-            hasWelcomedToProfileRef.current = true;
-            speak(`Bienvenido ${userName}, dime, ¿en qué te puedo ayudar hoy?`);
-            // El listening se reiniciará automáticamente cuando termine de hablar
-            // (manejado en la función speak)
-          }, 1000);
-
-          return () => {
-            clearTimeout(timer);
-          };
-        } catch (e) {
-          console.error('Error parsing user from localStorage:', e);
-        }
-      }
-    } else if (location.pathname !== '/mirror') {
-      hasWelcomedToProfileRef.current = false;
-    }
-  }, [location.pathname]);
+  // El saludo de bienvenida cuando el usuario entra a su perfil ahora se maneja en useMirrorCommands
 
   // Cargar voces disponibles
   useEffect(() => {
