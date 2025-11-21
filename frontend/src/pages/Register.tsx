@@ -93,9 +93,9 @@ export default function Register() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#928779] via-[#FCDEBE] to-[#928779]">
+      <div className="bg-[#FDEBD8] shadow-xl rounded-2xl p-8 w-full max-w-md">
+        <h2 className="text-2xl font-semibold text-center text-[#5B3000] mb-6">
           Registro de usuario
         </h2>
 
@@ -106,7 +106,7 @@ export default function Register() {
             value={formData.name}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg border-[#8F4C00]  focus:ring-2 focus:ring-blue-500"
           />
           <input
             name="age"
@@ -115,7 +115,7 @@ export default function Register() {
             value={formData.age || ""}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg border-[#8F4C00]  focus:ring-2 focus:ring-blue-500"
           />
           <input
             name="email"
@@ -124,7 +124,7 @@ export default function Register() {
             value={formData.email}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg border-[#8F4C00] focus:ring-2 focus:ring-blue-500"
           />
           <input
             name="password"
@@ -133,7 +133,7 @@ export default function Register() {
             value={formData.password}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg border-[#8F4C00]  focus:ring-2 focus:ring-blue-500"
           />
           <input
             name="location"
@@ -141,17 +141,17 @@ export default function Register() {
             value={formData.location}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg border-[#8F4C00]  focus:ring-2 focus:ring-blue-500"
           />
 
           {/* --- Subida de imagen facial --- */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[#8F4C00] mb-1">
               Foto de Rostro del Usuario
             </label>
             <div
               className={`border-2 border-dashed rounded-lg p-4 text-center ${
-                faceError ? "border-red-400" : "border-gray-300"
+                faceError ? "border-red-400" : "border-[#8F4C00] "
               }`}
             >
               <input
@@ -163,7 +163,7 @@ export default function Register() {
               />
               <label
                 htmlFor="faceImage"
-                className="cursor-pointer inline-block px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm"
+                className="cursor-pointer text-white inline-block px-4 py-2 bg-[#928779] hover:bg-[#6C6358] rounded-md text-sm"
               >
                 Seleccionar imagen
               </label>
@@ -197,7 +197,7 @@ export default function Register() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            className="w-full bg-[#928779] text-white py-2 rounded-lg hover:bg-[#6C6358] transition"
           >
             Registrarme
           </button>
@@ -208,7 +208,7 @@ export default function Register() {
         <button
           type="button"
           onClick={() => navigate("/login")}
-          className="mt-4 w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition"
+          className="mt-4 w-full bg-[#FDEBD8] text-[#5B3000] border border-[#5B3000] py-2 rounded-lg hover:bg-[#E2D7CF] transition"
         >
           Ya tengo cuenta — Iniciar sesión
         </button>
