@@ -29,7 +29,7 @@ export default function Login() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      setStatus("Cámara activa. Posiciona tu rostro frente a la cámara.");
+      setStatus("Posiciona tu rostro frente a la cámara.");
     } catch (err) {
       console.error("Error accediendo a la cámara:", err);
       setError("No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara.");
@@ -156,12 +156,12 @@ export default function Login() {
   }, [handleFaceLogin]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-      <div className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-2">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#928779] via-[#FCDEBE] to-[#928779]">
+      <div className="bg-[#FDEBD8] shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
+        <h2 className="text-3xl font-bold text-center text-[#5B3000] mb-2">
           Iniciar sesión
         </h2>
-        <p className="text-center text-gray-600 mb-6">
+        <p className="text-center text-[#5B3000] mb-6">
           Reconocimiento facial
         </p>
 
@@ -177,7 +177,7 @@ export default function Login() {
           <canvas ref={canvasRef} className="hidden" />
           
           {status && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-600/90 text-white px-4 py-2 rounded-lg text-sm">
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-[rgba(253,235,216,0.4)] text-white px-4 py-2 rounded-lg text-sm">
               {status}
             </div>
           )}
@@ -196,7 +196,7 @@ export default function Login() {
             className={`w-full py-3 rounded-lg font-semibold transition ${
               isScanning
                 ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-[#928779] hover:bg-[#6C6358] text-white"
             }`}
           >
             {isScanning ? "Reconociendo..." : "Iniciar sesión con reconocimiento facial"}
@@ -204,7 +204,7 @@ export default function Login() {
 
           <button
             onClick={startCamera}
-            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-[#928779] transition"
           >
             Reiniciar cámara
           </button>
@@ -267,7 +267,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-lg bg-gray-800 text-white font-semibold hover:bg-gray-900 transition"
+                className="w-full py-3 rounded-lg bg-[#928779] text-white font-semibold hover:bg-[#6C6358] transition"
               >
                 Iniciar sesión
               </button>
