@@ -79,7 +79,7 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
 
           <button
             onClick={handleAddTask}
-            className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition w-full"
+            className="bg-[#928779] text-white px-3 py-1 rounded-lg hover:bg-[#6C6358] transition w-full"
           >
             Save
           </button>
