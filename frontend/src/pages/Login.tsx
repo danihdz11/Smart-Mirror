@@ -204,7 +204,7 @@ export default function Login() {
 
           <button
             onClick={startCamera}
-            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-[#928779] transition"
+            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-[#928779] hover:text-white transition"
           >
             Reiniciar cámara
           </button>
@@ -272,6 +272,37 @@ export default function Login() {
                 Iniciar sesión
               </button>
             </form>
+
+
+            {/* --- NUEVA SECCIÓN: enlaces extra --- */}
+            <div className="mt-8 flex flex-col items-center gap-3">
+
+              {/* Link a registro */}
+              <p className="text-sm text-[#5B3000]">
+                ¿No tienes cuenta?{" "}
+                <button
+                  onClick={() => navigate("/register")}
+                  className="text-[#8F4C00] font-semibold hover:underline"
+                >
+                  Crear cuenta
+                </button>
+              </p>
+
+              {/* Botón volver al espejo */}
+              <button
+                onClick={() => navigate("/mirror")}
+                className="px-4 py-2 rounded-lg bg-[#FDEBD8] text-[#5B3000] border border-[#5B3000] hover:bg-[#E2D7CF] transition"
+              >
+                Volver al espejo
+              </button>
+
+            </div>
+
+
+
+
+
+
           </div>
 
 
