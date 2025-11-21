@@ -18,7 +18,9 @@ export function useVirtualAssistant() {
   const recordingIntervalRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
 
-  // Función para procesar el transcript
+  // =====================================================
+  //  Procesar transcript
+  // =====================================================
   const processTranscript = (transcript: string, confidence: number = 1.0) => {
     const normalizedTranscript = transcript.toLowerCase().trim();
     
@@ -27,30 +29,32 @@ export function useVirtualAssistant() {
     console.log('¿Estamos esperando respuesta?', isWaitingForAnswerRef.current);
     console.log('¿Estamos en login?', location.pathname === '/login');
     
-    // Si la confianza es muy baja, ignorar (probablemente ruido)
     if (confidence > 0 && confidence < 0.3) {
       console.log('⚠️ Confianza muy baja, ignorando (probablemente ruido)');
       return;
     }
 
-    // Si estamos en la página de login y estamos esperando respuesta
+    // ===========================
+    // 1) LÓGICA EN /login
+    // ===========================
     if (location.pathname === '/login' && isWaitingForAnswerRef.current) {
       console.log('🔍 Procesando respuesta en login:', normalizedTranscript);
       console.log('Longitud del transcript:', normalizedTranscript.length);
       
-      // Normalizar el transcript: quitar acentos y convertir a minúsculas
-      const normalized = normalizedTranscript.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const normalized = normalizedTranscript
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
       
-      // Validación: debe ser una palabra/frase clara y no muy corta
       if (normalized.length < 1) {
         console.log('⚠️ Transcript muy corto, ignorando (probablemente ruido)');
         return;
       }
       
-      // Variantes de "SÍ" - más flexibles y sin depender de acentos
       const yesPatterns = [
-        'si',           // sin acento
-        'sí',           // con acento (por si acaso)
+        'si',
+        'sí',
         'yes',
         'ok',
         'okey',
@@ -78,7 +82,6 @@ export function useVirtualAssistant() {
         'quiero entrar'
       ];
       
-      // Variantes de "NO"
       const noPatterns = [
         'no',
         'nop',
@@ -91,19 +94,26 @@ export function useVirtualAssistant() {
         'atras'
       ];
       
-      // Verificar si coincide con algún patrón de "SÍ"
       const isYes = yesPatterns.some(pattern => {
-        const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        // Buscar como palabra completa o como parte del texto
-        return normalized.includes(normalizedPattern) || 
-               normalized.split(/\s+/).some(word => word === normalizedPattern);
+        const normalizedPattern = pattern
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        return (
+          normalized.includes(normalizedPattern) ||
+          normalized.split(/\s+/).some(word => word === normalizedPattern)
+        );
       });
       
-      // Verificar si coincide con algún patrón de "NO"
       const isNo = noPatterns.some(pattern => {
-        const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        return normalized.includes(normalizedPattern) || 
-               normalized.split(/\s+/).some(word => word === normalizedPattern);
+        const normalizedPattern = pattern
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        return (
+          normalized.includes(normalizedPattern) ||
+          normalized.split(/\s+/).some(word => word === normalizedPattern)
+        );
       });
       
       console.log('Transcript normalizado:', normalized);
@@ -113,9 +123,7 @@ export function useVirtualAssistant() {
       if (isYes) {
         console.log('✅✅✅ Usuario dijo SÍ claramente, activando reconocimiento facial...');
         isWaitingForAnswerRef.current = false;
-        
         stopListening();
-        
         speak('Perfecto, leyendo tu rostro');
         
         setTimeout(() => {
@@ -129,7 +137,6 @@ export function useVirtualAssistant() {
         isWaitingForAnswerRef.current = false;
         
         stopListening();
-        
         speak('Redirigiendo a la vista normal');
         
         localStorage.removeItem('user');
@@ -149,34 +156,39 @@ export function useVirtualAssistant() {
       }
     }
 
-    // Detectar comando para salir/logout (solo si estamos en el perfil)
+    // ===========================
+    // 2) LÓGICA EN /mirror
+    // ===========================
     if (location.pathname === '/mirror') {
       const normalized = normalizedTranscript.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       
-      // Detectar comando para leer noticias
-      if (!isReadingNewsRef.current && 
-          (normalized.includes('dime las noticias') || 
-           normalized.includes('dime las noticia') ||
-           normalized.includes('lee las noticias') ||
-           normalized.includes('lee las noticia') ||
-           normalized.includes('cuéntame las noticias') ||
-           normalized.includes('cuentame las noticias'))) {
+      // Leer noticias
+      if (
+        !isReadingNewsRef.current && (
+          normalized.includes('dime las noticias') ||
+          normalized.includes('dime las noticia') ||
+          normalized.includes('lee las noticias') ||
+          normalized.includes('lee las noticia') ||
+          normalized.includes('cuéntame las noticias') ||
+          normalized.includes('cuentame las noticias')
+        )
+      ) {
         console.log('Usuario pidió leer las noticias...');
         
         isReadingNewsRef.current = true;
-        
         stopListening();
-        
         fetchNewsAndRead();
-        
         return;
       }
       
-      if (normalized.includes('salir') || 
-          normalized.includes('cerrar sesion') ||
-          normalized.includes('cerrar sesión') ||
-          normalized.includes('logout') ||
-          normalized.includes('desconectar')) {
+      // Logout / salir
+      if (
+        normalized.includes('salir') || 
+        normalized.includes('cerrar sesion') ||
+        normalized.includes('cerrar sesión') ||
+        normalized.includes('logout') ||
+        normalized.includes('desconectar')
+      ) {
         console.log('Usuario pidió salir, ejecutando logout...');
         
         stopListening();
@@ -200,12 +212,14 @@ export function useVirtualAssistant() {
       }
     }
 
-    // Detectar comando para iniciar sesión
-    // Normalizar el transcript para quitar acentos y hacer la búsqueda más flexible
-    const normalizedForLogin = normalizedTranscript.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // ===========================
+    // 3) Comando para iniciar sesión
+    // ===========================
+    const normalizedForLogin = normalizedTranscript
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
     
     if (location.pathname !== '/login') {
-      // Variantes del comando "iniciar sesión"
       const loginPatterns = [
         'quiero iniciar sesion',
         'quiero iniciar sesión',
@@ -221,28 +235,39 @@ export function useVirtualAssistant() {
       ];
       
       const matchesLogin = loginPatterns.some(pattern => {
-        const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const normalizedPattern = pattern
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
         return normalizedForLogin.includes(normalizedPattern);
       });
       
       if (matchesLogin) {
         console.log('✅ Comando detectado: iniciar sesión');
         console.log('Navegando a login...');
-        stopListening(); // Detener el reconocimiento antes de navegar
+        stopListening();
         navigate('/login');
-        return; // Salir para no procesar más comandos
+        return;
       }
     }
   };
 
-  // Función para iniciar la grabación de audio
+  // =====================================================
+  //  Inicio de escucha
+  // =====================================================
   const startListening = async () => {
+    console.log(
+      '👉 startListening llamado. isProcessing:',
+      isProcessingRef.current,
+      'isListening:',
+      isListening
+    );
+
     if (isProcessingRef.current || isListening) {
+      console.log('⛔ startListening abortado porque ya está procesando o escuchando');
       return;
     }
 
     try {
-      // Solicitar acceso al micrófono
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -253,7 +278,6 @@ export function useVirtualAssistant() {
       
       audioStreamRef.current = stream;
       
-      // Fallback si webm no está disponible
       let mimeType = 'audio/webm';
       if (!MediaRecorder.isTypeSupported('audio/webm')) {
         if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -261,7 +285,7 @@ export function useVirtualAssistant() {
         } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
           mimeType = 'audio/ogg;codecs=opus';
         } else {
-          mimeType = 'audio/webm'; // Intentar de todas formas
+          mimeType = 'audio/webm';
         }
       }
       
@@ -285,7 +309,6 @@ export function useVirtualAssistant() {
         
         const audioBlob = new Blob(audioChunks, { type: mimeType });
         
-        // Validar que el blob tenga un tamaño mínimo (al menos 1KB)
         if (audioBlob.size < 1024) {
           console.log('Audio demasiado pequeño, ignorando:', audioBlob.size, 'bytes');
           setIsListening(false);
@@ -293,7 +316,6 @@ export function useVirtualAssistant() {
           return;
         }
         
-        // Procesar el audio
         try {
           isProcessingRef.current = true;
           console.log('Enviando audio para transcripción, tamaño:', audioBlob.size, 'bytes');
@@ -304,7 +326,6 @@ export function useVirtualAssistant() {
           }
         } catch (error: any) {
           console.error('Error al transcribir audio:', error);
-          // Mostrar más detalles del error
           if (error.response) {
             console.error('Error del servidor:', error.response.status, error.response.data);
           }
@@ -312,11 +333,11 @@ export function useVirtualAssistant() {
           isProcessingRef.current = false;
           setIsListening(false);
           
-          // Reiniciar grabación si es necesario
           const user = localStorage.getItem('user');
-          const shouldRestart = (isWaitingForAnswerRef.current && location.pathname === '/login') ||
-                               (!user && hasGreetedRef.current) ||
-                               (user && location.pathname === '/mirror' && hasWelcomedToProfileRef.current);
+          const shouldRestart =
+            (isWaitingForAnswerRef.current && location.pathname === '/login') ||
+            (!user && hasGreetedRef.current) ||
+            (user && location.pathname === '/mirror' && hasWelcomedToProfileRef.current);
           
           if (shouldRestart) {
             setTimeout(() => {
@@ -326,17 +347,14 @@ export function useVirtualAssistant() {
         }
       };
       
-      // Iniciar grabación
       mediaRecorder.start();
       setIsListening(true);
       console.log('Escuchando...');
       
-      // Grabar en chunks de 3 segundos y procesar
       recordingIntervalRef.current = window.setInterval(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           
-          // Reiniciar inmediatamente para continuar escuchando
           setTimeout(() => {
             if (mediaRecorderRef.current && audioStreamRef.current) {
               const newRecorder = new MediaRecorder(audioStreamRef.current, { mimeType });
@@ -358,7 +376,6 @@ export function useVirtualAssistant() {
                 
                 const audioBlob = new Blob(newChunks, { type: mimeType });
                 
-                // Validar que el blob tenga un tamaño mínimo (al menos 1KB)
                 if (audioBlob.size < 1024) {
                   console.log('Audio demasiado pequeño, ignorando:', audioBlob.size, 'bytes');
                   setIsListening(false);
@@ -376,7 +393,6 @@ export function useVirtualAssistant() {
                   }
                 } catch (error: any) {
                   console.error('Error al transcribir audio:', error);
-                  // Mostrar más detalles del error
                   if (error.response) {
                     console.error('Error del servidor:', error.response.status, error.response.data);
                   }
@@ -384,11 +400,11 @@ export function useVirtualAssistant() {
                   isProcessingRef.current = false;
                   setIsListening(false);
                   
-                  // Reiniciar si es necesario
                   const user = localStorage.getItem('user');
-                  const shouldRestart = (isWaitingForAnswerRef.current && location.pathname === '/login') ||
-                                       (!user && hasGreetedRef.current) ||
-                                       (user && location.pathname === '/mirror' && hasWelcomedToProfileRef.current);
+                  const shouldRestart =
+                    (isWaitingForAnswerRef.current && location.pathname === '/login') ||
+                    (!user && hasGreetedRef.current) ||
+                    (user && location.pathname === '/mirror' && hasWelcomedToProfileRef.current);
                   
                   if (shouldRestart) {
                     setTimeout(() => {
@@ -403,7 +419,7 @@ export function useVirtualAssistant() {
             }
           }, 100);
         }
-      }, 3000); // Grabar cada 3 segundos
+      }, 3000);
       
     } catch (error) {
       console.error('Error al acceder al micrófono:', error);
@@ -412,7 +428,9 @@ export function useVirtualAssistant() {
     }
   };
 
-  // Función para detener la grabación
+  // =====================================================
+  //  Detener escucha
+  // =====================================================
   const stopListening = () => {
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
@@ -441,7 +459,9 @@ export function useVirtualAssistant() {
     isProcessingRef.current = false;
   };
 
-  // Función para hablar usando el backend (más confiable en Raspberry Pi)
+  // =====================================================
+  //  Hablar usando backend TTS (+ fallback)
+  // =====================================================
   const speak = async (text: string): Promise<void> => {
     if (!text || text.trim().length === 0) {
       return Promise.resolve();
@@ -450,17 +470,14 @@ export function useVirtualAssistant() {
     return new Promise<void>((resolve) => {
       (async () => {
         try {
-          // Intentar primero con el backend (usa el sistema de audio del OS, igual que YouTube)
           console.log('Generando audio con backend TTS...');
           const audioBlob = await synthesizeSpeech(text, 'es');
           
-          // Crear URL del blob y reproducirlo
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
           
           audio.onended = () => {
             console.log('Terminó de hablar');
-            // Liberar la URL del blob después de reproducir
             URL.revokeObjectURL(audioUrl);
             resolve();
           };
@@ -468,23 +485,19 @@ export function useVirtualAssistant() {
           audio.onerror = (error) => {
             console.error('Error al reproducir audio:', error);
             URL.revokeObjectURL(audioUrl);
-            // Fallback a speechSynthesis si falla
             fallbackToSpeechSynthesisWithCallback(text, resolve);
           };
           
-          // Reproducir el audio
           await audio.play();
           
         } catch (error) {
           console.error('Error al generar audio con backend, usando fallback:', error);
-          // Fallback a speechSynthesis si el backend falla
           fallbackToSpeechSynthesisWithCallback(text, resolve);
         }
       })();
     });
   };
 
-  // Fallback a speechSynthesis del navegador (por si el backend falla)
   const fallbackToSpeechSynthesisWithCallback = (text: string, callback?: () => void) => {
     if (!('speechSynthesis' in window)) {
       console.warn('Tu navegador no soporta síntesis de voz y el backend falló');
@@ -517,7 +530,9 @@ export function useVirtualAssistant() {
     synthesisRef.current = window.speechSynthesis;
   };
 
-  // Función para obtener y leer las noticias del widget
+  // =====================================================
+  //  Noticias
+  // =====================================================
   const fetchNewsAndRead = async () => {
     try {
       console.log('Obteniendo noticias del widget...');
@@ -549,10 +564,8 @@ export function useVirtualAssistant() {
 
         console.log('Leyendo noticias:', newsText);
         
-        // Usar la función speak() que ahora usa el backend
         await speak(newsText);
         
-        // Cuando termine de hablar, reiniciar el listening
         console.log('Terminó de leer las noticias');
         isReadingNewsRef.current = false;
         
@@ -573,14 +586,18 @@ export function useVirtualAssistant() {
     }
   };
 
-  // Limpiar recursos al desmontar
+  // =====================================================
+  //  Limpieza al desmontar
+  // =====================================================
   useEffect(() => {
     return () => {
       stopListening();
     };
   }, []);
 
-  // Saludo inicial después de 5 segundos
+  // =====================================================
+  //  Saludo inicial en home (sin usuario)
+  // =====================================================
   useEffect(() => {
     const checkUser = () => {
       const user = localStorage.getItem('user');
@@ -605,7 +622,9 @@ export function useVirtualAssistant() {
     };
   }, []);
 
-  // Cuando llegamos a la página de login
+  // =====================================================
+  //  Pregunta en /login
+  // =====================================================
   useEffect(() => {
     if (location.pathname === '/login' && !hasAskedLoginRef.current) {
       hasAskedLoginRef.current = true;
@@ -627,7 +646,7 @@ export function useVirtualAssistant() {
             if (isWaitingForAnswerRef.current) {
               startListening();
             }
-          }, 4000); // Dar más tiempo para que termine de hablar
+          }, 4000);
         }, 2000);
       }, 1000);
 
@@ -640,7 +659,9 @@ export function useVirtualAssistant() {
     }
   }, [location.pathname]);
 
-  // Cuando el usuario entra a su perfil
+  // =====================================================
+  //  Saludo al entrar a /mirror (con stopListening + await)
+  // =====================================================
   useEffect(() => {
     if (location.pathname === '/mirror') {
       const userFromStorage = localStorage.getItem('user');
@@ -651,18 +672,30 @@ export function useVirtualAssistant() {
           const userName = user.name || 'Usuario';
           
           console.log(`Usuario ${userName} entró a su perfil, saludando...`);
-          
-          const timer = setTimeout(() => {
-            hasWelcomedToProfileRef.current = true;
-            speak(`Bienvenido ${userName}, dime, ¿en qué te puedo ayudar hoy?`);
-            
-            setTimeout(() => {
-              startListening();
-            }, 2000);
-          }, 1000);
+
+          // Asegúrate de que NO haya nada escuchando antes del saludo
+          stopListening();
+          hasWelcomedToProfileRef.current = true;
+          let cancelled = false;
+
+          (async () => {
+            try {
+              await new Promise(res => setTimeout(res, 1000));
+              await speak(`Bienvenido ${userName}, dime, ¿en qué te puedo ayudar hoy?`);
+              if (!cancelled) {
+                console.log('Saludo terminado, comenzando a escuchar...');
+                startListening();
+              }
+            } catch (e) {
+              console.error('Error durante el saludo de perfil:', e);
+              if (!cancelled) {
+                startListening();
+              }
+            }
+          })();
 
           return () => {
-            clearTimeout(timer);
+            cancelled = true;
           };
         } catch (e) {
           console.error('Error parsing user from localStorage:', e);
@@ -673,7 +706,9 @@ export function useVirtualAssistant() {
     }
   }, [location.pathname]);
 
-  // Cargar voces disponibles
+  // =====================================================
+  //  Cargar voces disponibles
+  // =====================================================
   useEffect(() => {
     const loadVoices = () => {
       window.speechSynthesis.getVoices();
