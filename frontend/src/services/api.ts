@@ -67,3 +67,34 @@ export const getWeather = async (city: string, country: string = "MX"): Promise<
   });
   return res.data;
 };
+
+// Speech recognition API
+export interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+}
+
+export const transcribeAudio = async (audioBlob: Blob, lang: string = "es-MX"): Promise<SpeechRecognitionResult> => {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "audio.webm");
+  formData.append("lang", lang);
+
+  const res = await axios.post(`${API_URL}/speech/transcribe`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30000, // 30 segundos timeout
+  });
+  return res.data;
+};
+
+// Text-to-Speech API
+export const synthesizeSpeech = async (text: string, lang: string = "es"): Promise<Blob> => {
+  const res = await axios.post(
+    `${API_URL}/speech/synthesize`,
+    { text, lang },
+    {
+      responseType: 'blob', // Importante: recibir como blob para el audio
+      timeout: 10000, // 10 segundos timeout
+    }
+  );
+  return res.data;
+};
