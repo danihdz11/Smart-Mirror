@@ -66,6 +66,8 @@ const voiceCommands: VoiceCommand[] = [
         clean.includes("cerrar sesion") ||
         clean.includes("cerrar sesión") ||
         clean.includes("logout") ||
+        clean.includes("adios") ||
+        clean.includes("adiós") ||
         clean.includes("desconectar")
       );
     },
@@ -310,6 +312,51 @@ const voiceCommands: VoiceCommand[] = [
     }, 1000);
   },
 },
+
+{
+  name: "dia_hoy",
+  match: (normalized, _ctx) => {
+    const clean = normalized
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return (
+      clean.includes("dia es hoy") ||      // qué día es hoy
+      clean.includes("día es hoy") ||
+      clean.includes("que dia es") ||
+      clean.includes("qué día es") ||
+      clean.includes("fecha de hoy") ||
+      clean.includes("dime la fecha") ||
+      clean.includes("que fecha es")
+    );
+  },
+  execute: async (_normalized, ctx) => {
+    ctx.stopListening();
+
+    // ======================
+    // Obtener fecha actual
+    // ======================
+    const hoy = new Date();
+
+    // Día de la semana y fecha en español
+    const opciones: Intl.DateTimeFormatOptions = {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    };
+
+    const fechaFormateada = hoy.toLocaleDateString("es-MX", opciones);
+
+    await ctx.speak(`Hoy es ${fechaFormateada}`);
+
+    setTimeout(() => {
+      ctx.startListening();
+    }, 800);
+  },
+},
+
 
 
 ];

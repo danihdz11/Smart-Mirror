@@ -612,7 +612,7 @@ export function useVirtualAssistant() {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-        speak("Hola, inicia sesión para poder empezar");
+        speak("a");
 
         setTimeout(() => {
           if (checkUser()) {
@@ -643,7 +643,7 @@ export function useVirtualAssistant() {
       const timer = setTimeout(() => {
         console.log("Haciendo pregunta: ¿Deseas iniciar sesión?");
         speak(
-          "¿Deseas iniciar sesión? Responde sí para leer tu rostro, o no para continuar sin iniciar sesión"
+          "¿Deseas iniciar sesión? Responde si en ingles o claro para leer tu rostro, o no para continuar sin iniciar sesión"
         );
 
         setTimeout(() => {
