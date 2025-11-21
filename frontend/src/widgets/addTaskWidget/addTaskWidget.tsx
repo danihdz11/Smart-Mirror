@@ -8,6 +8,9 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
 
+  const [deadline, setDeadline] = useState<string>("");
+
+
   const handleAddTask = async () => {
     try {
       const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -25,8 +28,11 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-        userId: user.id,
-        title
+          userId: user.id,
+          title,
+          date: deadline ? new Date(deadline) : null,
+          time: null,
+          repeat: "none"
         })
         // body: JSON.stringify({
         //   userId: user.id,
@@ -43,6 +49,7 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
         alert("Tarea agregada ✔");
         onTaskAdded();
         setTitle("");
+        setDeadline("");
         setIsOpen(false);
       } else {
         alert("Error: " + result.message);
@@ -76,6 +83,14 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
             value={title}
             onChange={e => setTitle(e.target.value)}
           />
+
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className="w-full border px-2 py-1 rounded-lg mb-3"
+          />
+
 
           <button
             onClick={handleAddTask}
