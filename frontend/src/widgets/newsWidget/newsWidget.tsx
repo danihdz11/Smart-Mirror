@@ -24,8 +24,8 @@ const NewsWidget: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-[#FFF8E7] rounded-2xl shadow-md p-4 text-black w-72 max-w-full overflow-hidden">
-      <h2 className="text-xl font-bold mb-2">🗞 Noticias del día</h2>
+    <div className="bg-[rgba(253,235,216,0.4)] rounded-2xl shadow-md p-4 text-black w-72 max-w-full overflow-hidden"> 
+      <h2 className="text-xl text-[#5B3000] font-bold mb-2">Noticias del día</h2>
       <ul className="text-sm space-y-2">
         {news.length > 0 ? (
           news.map((article, index) => (
@@ -34,7 +34,7 @@ const NewsWidget: React.FC = () => {
                 href={article.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:underline break-words"
+                className="hover:underline text-[#8F4C00] break-words"
               >
                 {article.title}
               </a>
