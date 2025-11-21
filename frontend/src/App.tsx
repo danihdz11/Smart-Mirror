@@ -41,10 +41,10 @@ function App() {
 
               {/* Calendario y Noticias(izquierda) */}
               <div className="absolute top-6 left-6 pointer-events-auto">
-                <NewsWidget />
+                <MiniCalendar />
               </div>
               <div className="absolute bottom-6 left-6 pointer-events-auto">
-                <MiniCalendar />
+                <NewsWidget />
               </div>
 
               {/* Widgets derechos */}
@@ -53,10 +53,6 @@ function App() {
                 <ToDoWidget refresh={refreshTasks}/>
                 {/* <QuoteWidget /> */}
               </div>
-
-              {/* <button className="absolute bottom-6 left-6 pointer-events-auto text-black text-2xl">
-                holaaaaaa
-              </button> */}
 
               <AddTaskWidget onTaskAdded={() => setRefreshTasks((prev) => prev + 1)}/>
             </MirrorView>

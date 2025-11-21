@@ -60,7 +60,7 @@ export default function AddTaskWidget({ onTaskAdded }: AddTaskWidgetProps) {
       {/* Botón + */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-blue-600 text-white text-lg rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:bg-blue-700 transition"
+        className="bg-[#FDEBD8] text-[#928779] text-lg rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:bg-[#FCE1C5] transition"
       >
         +
       </button>
