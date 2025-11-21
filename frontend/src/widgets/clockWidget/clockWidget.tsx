@@ -13,15 +13,27 @@ const ClockWidget: React.FC = () => {
       const minutes = now.getMinutes().toString().padStart(2, "0");
       const seconds = now.getSeconds().toString().padStart(2, "0");
       setTime(`${hours}:${minutes}:${seconds}`);
+
+
+      // Obtener día de la semana
+      const weekday = now.toLocaleDateString("es-ES", { weekday: "long" });
+
+      // Formatear DD/MM/YYYY
+      const day = now.getDate().toString().padStart(2, "0");
+      const month = (now.getMonth() + 1).toString().padStart(2, "0");
+      const year = now.getFullYear();
+
+      // Construir el formato final
+      setDate(`${weekday}, ${day}/${month}/${year}`);
       
       // Formatear fecha
-      const options: Intl.DateTimeFormatOptions = {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      };
-      setDate(now.toLocaleDateString("es-ES", options));
+      // const options: Intl.DateTimeFormatOptions = {
+      //   weekday: "long",
+      //   year: "numeric",
+      //   month: "long",
+      //   day: "numeric",
+      // };
+      // setDate(now.toLocaleDateString("es-ES", options));
     };
 
     // Actualizar inmediatamente
@@ -34,12 +46,13 @@ const ClockWidget: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-black/60 backdrop-blur-sm rounded-2xl p-6 text-white shadow-2xl pointer-events-auto">
-      <div className="text-6xl font-bold mb-2 font-mono">{time}</div>
-      <div className="text-xl font-medium capitalize">{date}</div>
+    <div className="bg-[rgba(253,235,216,0.4)] backdrop-blur-sm rounded-2xl p-3 text-[#5B3000] shadow-2xl text-center pointer-events-auto">
+      <div className="text-4xl font-bold mb-1 font-mono">{time}</div>
+      <div className="text-large font-medium capitalize">{date}</div>
     </div>
   );
 };
 
 export default ClockWidget;
 
+//bg-[#FDEBD8]

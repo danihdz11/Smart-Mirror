@@ -85,24 +85,24 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md text-white p-4 rounded-2xl shadow-md w-64">
-      <h2 className="text-lg font-semibold mb-3 text-center">📋 Pendientes</h2>
+    <div className="bg-[rgba(253,235,216,0.4)] backdrop-blur-md text-white p-4 rounded-2xl shadow-md w-64">
+      <h2 className="text-xl text-[#5B3000] font-bold mb-3 text-center">Pendientes</h2>
 
       {/* Estado de carga */}
       {loading && (
-        <p className="text-center text-sm text-gray-300">Cargando...</p>
+        <p className="text-center text-sm text-[#8F4C00]">Cargando...</p>
       )}
 
       {/* Usuario no logeado */}
       {!loading && !user && (
-        <p className="text-center text-sm text-gray-300">
+        <p className="text-center text-sm text-[#8F4C00]">
           Inicia sesión para ver tus tareas
         </p>
       )}
 
       {/* Usuario logeado pero sin tareas */}
       {!loading && user && tasks.length === 0 && (
-        <p className="text-center text-sm text-gray-300">
+        <p className="text-center text-sm text-[#8F4C00]">
           Nada por hacer 😄
         </p>
       )}
@@ -114,7 +114,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
             <li
               key={index}
               onClick={() => deleteTask(index)}
-              className="cursor-pointer transition hover:text-red-300"
+              className="cursor-pointer transition  text-[#8F4C00] hover:text-red-300"
             >
               {task.title}
             </li>
