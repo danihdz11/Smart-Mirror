@@ -124,7 +124,7 @@ async function manejarDatos(triggerPIR, valorLDR) {
       ledEncendida = true;
 
       // 🔊 Voz
-      decir("Di Log in para iniciar sesión");
+      decir("Hola, di Log In para iniciar sesión.");
     } else {
       // ❌ APAGAR
       console.log("⛔ Apagando LED…");
