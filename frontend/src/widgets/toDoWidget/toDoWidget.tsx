@@ -111,12 +111,29 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
       {!loading && tasks.length > 0 && (
         <ul className="space-y-2">
           {tasks.map((task, index) => (
+            // <li
+            //   key={index}
+            //   onClick={() => deleteTask(index)}
+            //   className="cursor-pointer transition  text-[#8F4C00] hover:text-red-300"
+            // >
+            //   {task.title}
+            // </li>
             <li
               key={index}
               onClick={() => deleteTask(index)}
-              className="cursor-pointer transition  text-[#8F4C00] hover:text-red-300"
+              className="cursor-pointer transition text-[#8F4C00] hover:text-red-300"
             >
-              {task.title}
+              <div className="flex flex-col">
+                {/* Título de la tarea */}
+                <span className="font-medium">{task.title}</span>
+
+                {/* Fecha límite (solo si existe) */}
+                {task.date && (
+                  <span className="text-xs text-[#5B3000] opacity-80 mt-0.5">
+                    📅 {new Date(task.date).toLocaleDateString("es-MX")}
+                  </span>
+                )}
+              </div>
             </li>
           ))}
         </ul>
