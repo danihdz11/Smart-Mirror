@@ -53,8 +53,8 @@ const MiniCalendar: React.FC = () => {
           opacity: 0.7,
         }}
       >
-        {["L", "M", "M", "J", "V", "S", "D"].map((d) => (
-          <div key={d}>{d}</div>
+        {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+          <div key={i}>{d}</div>
         ))}
       </div>
 

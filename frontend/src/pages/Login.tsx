@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginWithFace } from "../services/api";
+import { loginWithFace, loginUser } from "../services/api";
 
 export default function Login() {
   const [isScanning, setIsScanning] = useState(false);
@@ -29,7 +29,7 @@ export default function Login() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      setStatus("Cámara activa. Posiciona tu rostro frente a la cámara.");
+      setStatus("Posiciona tu rostro frente a la cámara.");
     } catch (err) {
       console.error("Error accediendo a la cámara:", err);
       setError("No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara.");
@@ -156,12 +156,12 @@ export default function Login() {
   }, [handleFaceLogin]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-      <div className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-2">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#928779] via-[#FCDEBE] to-[#928779]">
+      <div className="bg-[#FDEBD8] shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
+        <h2 className="text-3xl font-bold text-center text-[#5B3000] mb-2">
           Iniciar sesión
         </h2>
-        <p className="text-center text-gray-600 mb-6">
+        <p className="text-center text-[#5B3000] mb-6">
           Reconocimiento facial
         </p>
 
@@ -177,7 +177,7 @@ export default function Login() {
           <canvas ref={canvasRef} className="hidden" />
           
           {status && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-600/90 text-white px-4 py-2 rounded-lg text-sm">
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-[rgba(253,235,216,0.4)] text-white px-4 py-2 rounded-lg text-sm">
               {status}
             </div>
           )}
@@ -196,7 +196,7 @@ export default function Login() {
             className={`w-full py-3 rounded-lg font-semibold transition ${
               isScanning
                 ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-[#928779] hover:bg-[#6C6358] text-white"
             }`}
           >
             {isScanning ? "Reconociendo..." : "Iniciar sesión con reconocimiento facial"}
@@ -204,10 +204,112 @@ export default function Login() {
 
           <button
             onClick={startCamera}
-            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+            className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-[#928779] hover:text-white transition"
           >
             Reiniciar cámara
           </button>
+
+
+          {/* --- Login alterno con usuario y contraseña --- */}
+          <div className="mt-10">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-grow h-px bg-gray-300"></div>
+              <span className="text-gray-500 text-sm">o iniciar sesión con usuario y contraseña</span>
+              <div className="flex-grow h-px bg-gray-300"></div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setError("");
+                setStatus("Iniciando sesión...");
+
+                const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value;
+                const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
+
+                try {
+                  // Llamar a la API usando tu api.ts
+                  const response = await loginUser({ email, password });
+
+                  // Guardar sesión
+                  localStorage.setItem("token", response.token);
+                  localStorage.setItem("user", JSON.stringify(response.user));
+
+                  setStatus(`¡Bienvenido, ${response.user.name}!`);
+
+                  // Redirigir a /mirror
+                  setTimeout(() => navigate("/mirror"), 1200);
+
+                } catch (err: any) {
+                  console.error(err);
+                  setError(err.response?.data?.message || "Credenciales incorrectas");
+                  setStatus("");
+                }
+              }}
+
+              className="flex flex-col gap-4"
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Correo electrónico"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+
+              <input
+                type="password"
+                name="password"
+                placeholder="Contraseña"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-[#928779] text-white font-semibold hover:bg-[#6C6358] transition"
+              >
+                Iniciar sesión
+              </button>
+            </form>
+
+
+            {/* --- NUEVA SECCIÓN: enlaces extra --- */}
+            <div className="mt-8 flex flex-col items-center gap-3">
+
+              {/* Link a registro */}
+              <p className="text-sm text-[#5B3000]">
+                ¿No tienes cuenta?{" "}
+                <button
+                  onClick={() => navigate("/register")}
+                  className="text-[#8F4C00] font-semibold hover:underline"
+                >
+                  Crear cuenta
+                </button>
+              </p>
+
+              {/* Botón volver al espejo */}
+              <button
+                onClick={() => navigate("/mirror")}
+                className="px-4 py-2 rounded-lg bg-[#FDEBD8] text-[#5B3000] border border-[#5B3000] hover:bg-[#E2D7CF] transition"
+              >
+                Volver al espejo
+              </button>
+
+            </div>
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
         </div>
       </div>
     </div>

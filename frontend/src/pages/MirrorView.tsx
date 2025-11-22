@@ -122,23 +122,23 @@ export default function MirrorView({ children }: MirrorViewProps) {
       />
 
       {/* Mensaje de bienvenida central */}
-      {showWelcome && userName && (
+      {/* {showWelcome && userName && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div className="bg-blue-600/95 text-white px-8 py-4 rounded-lg shadow-2xl text-center animate-fade-in">
             <h2 className="text-4xl font-bold mb-2">¡Bienvenido!</h2>
             <p className="text-2xl">{userName}</p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Mensaje permanente debajo del reloj */}
-      {showPermanentMessage && userName && (
+      {/* {showPermanentMessage && userName && (
         <div className="absolute top-[200px] left-6 pointer-events-none z-40">
           <div className="bg-black/60 backdrop-blur-sm text-white px-6 py-3 rounded-lg shadow-lg">
             <p className="text-xl font-medium">A tus órdenes, {userName}</p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Overlay para widgets */}
       <div className="absolute inset-0 pointer-events-none">

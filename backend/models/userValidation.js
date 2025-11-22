@@ -16,7 +16,8 @@ export const taskSchema = Joi.object({
   date: Joi.date().optional().allow(null),    // .required()
   time: Joi.string()
     .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
-    .required(),
+    .optional()
+    .allow(null, ""),
   repeat: Joi.string()
     .valid("none", "daily", "weekly", "monthly")
     .default("none")

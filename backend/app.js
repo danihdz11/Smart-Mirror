@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.js";
 import newsRoutes from "./routes/newsRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
+import speechRoutes from "./routes/speechRoutes.js";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api/news", newsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/speech", speechRoutes);
 
 // 🚀 Iniciar servidor
 const PORT = process.env.PORT || 5001;
