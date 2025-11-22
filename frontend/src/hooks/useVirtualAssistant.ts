@@ -26,12 +26,52 @@ export function useVirtualAssistant() {
   const recordingIntervalRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
 
+  // 🔊 Estado de voz
+  const isSpeakingRef = useRef(false);
+  const pendingStartListeningRef = useRef(false);
+
+  // 🧠 Reconocimiento facial
+  const isFaceRecognitionActiveRef = useRef(false);
+  const resumeAfterSpeechRef = useRef(false);
+
   // =====================================================
   //  Helpers para flags
   // =====================================================
   const resetWelcomeFlags = () => {
     hasWelcomedToProfileRef.current = false;
     hasGreetedRef.current = false;
+  };
+
+  // 🔔 Sonidito cuando ya puede hablar el usuario
+  const playReadySound = () => {
+    try {
+      const AudioCtx =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+
+      osc.onended = () => {
+        ctx.close();
+      };
+    } catch (e) {
+      console.error("No se pudo reproducir el beep de listo para hablar:", e);
+    }
   };
 
   // =====================================================
@@ -144,7 +184,11 @@ export function useVirtualAssistant() {
           "✅✅✅ Usuario dijo SÍ claramente, activando reconocimiento facial..."
         );
         isWaitingForAnswerRef.current = false;
+
+        // 🔇 Apagamos el micrófono y marcamos reconocimiento facial activo
         stopListening();
+        isFaceRecognitionActiveRef.current = true;
+
         speak("Perfecto, leyendo tu rostro");
 
         setTimeout(() => {
@@ -195,15 +239,12 @@ export function useVirtualAssistant() {
     const handled = handleVoiceCommands(normalizedTranscript, ctx);
 
     if (handled) {
-      // Algún comando se encargó del transcript
       return;
     }
 
     // ===========================
-    // 3) (Opcional) Lógica extra local
+    // 3) Lógica extra local (si quieres)
     // ===========================
-    // Aquí podrías agregar lógica muy específica que NO quieras
-    // mover al archivo externo.
   };
 
   // =====================================================
@@ -217,12 +258,23 @@ export function useVirtualAssistant() {
       isListening
     );
 
+    // ⛔ Bloqueo si está hablando o en reconocimiento facial
+    if (isSpeakingRef.current || isFaceRecognitionActiveRef.current) {
+      console.log(
+        "⛔ No inicio escucha porque el asistente está hablando o en reconocimiento facial, lo programo para después"
+      );
+      pendingStartListeningRef.current = true;
+      return;
+    }
+
     if (isProcessingRef.current || isListening) {
       console.log(
         "⛔ startListening abortado porque ya está procesando o escuchando"
       );
       return;
     }
+
+    playReadySound();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -348,12 +400,12 @@ export function useVirtualAssistant() {
                   return;
                 }
 
-                const audioBlob = new Blob(newChunks, { type: mimeType });
+                const audioBlob2 = new Blob(newChunks, { type: mimeType });
 
-                if (audioBlob.size < 1024) {
+                if (audioBlob2.size < 1024) {
                   console.log(
                     "Audio demasiado pequeño, ignorando:",
-                    audioBlob.size,
+                    audioBlob2.size,
                     "bytes"
                   );
                   setIsListening(false);
@@ -365,10 +417,10 @@ export function useVirtualAssistant() {
                   isProcessingRef.current = true;
                   console.log(
                     "Enviando audio para transcripción, tamaño:",
-                    audioBlob.size,
+                    audioBlob2.size,
                     "bytes"
                   );
-                  const result = await transcribeAudio(audioBlob, "es-MX");
+                  const result = await transcribeAudio(audioBlob2, "es-MX");
 
                   if (result.transcript) {
                     processTranscript(result.transcript, result.confidence);
@@ -458,25 +510,48 @@ export function useVirtualAssistant() {
       return Promise.resolve();
     }
 
+    stopListening();
+    isSpeakingRef.current = true;
+
     return new Promise<void>((resolve) => {
       (async () => {
+        const onFinish = () => {
+          console.log("🔚 Fin de speak()");
+          isSpeakingRef.current = false;
+
+          // Si venimos de reconocimiento facial:
+          if (resumeAfterSpeechRef.current) {
+            resumeAfterSpeechRef.current = false;
+            startListening();
+            resolve();
+            return;
+          }
+
+          // Caso general
+          if (pendingStartListeningRef.current) {
+            pendingStartListeningRef.current = false;
+            startListening();
+          }
+
+          resolve();
+        };
+
         try {
           console.log("Generando audio con backend TTS...");
           const audioBlob = await synthesizeSpeech(text, "es");
-
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
 
           audio.onended = () => {
             console.log("Terminó de hablar");
             URL.revokeObjectURL(audioUrl);
-            resolve();
+            onFinish();
           };
 
           audio.onerror = (error) => {
             console.error("Error al reproducir audio:", error);
             URL.revokeObjectURL(audioUrl);
-            fallbackToSpeechSynthesisWithCallback(text, resolve);
+            fallbackToSpeechSynthesisWithCallback(text, onFinish);
           };
 
           await audio.play();
@@ -485,7 +560,7 @@ export function useVirtualAssistant() {
             "Error al generar audio con backend, usando fallback:",
             error
           );
-          fallbackToSpeechSynthesisWithCallback(text, resolve);
+          fallbackToSpeechSynthesisWithCallback(text, onFinish);
         }
       })();
     });
@@ -529,7 +604,7 @@ export function useVirtualAssistant() {
   };
 
   // =====================================================
-  //  Noticias (ahora se auto-protege con isReadingNewsRef)
+  //  Noticias
   // =====================================================
   const fetchNewsAndRead = async () => {
     if (isReadingNewsRef.current) {
@@ -664,6 +739,11 @@ export function useVirtualAssistant() {
     } else if (location.pathname !== "/login") {
       hasAskedLoginRef.current = false;
       isWaitingForAnswerRef.current = false;
+
+      // 🔓 Reseteo de cualquier estado colgado de reconocimiento
+      isFaceRecognitionActiveRef.current = false;
+      resumeAfterSpeechRef.current = false;
+      pendingStartListeningRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
@@ -718,6 +798,28 @@ export function useVirtualAssistant() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // =====================================================
+  //  Fin de reconocimiento facial
+  // =====================================================
+  useEffect(() => {
+    const handleFaceLoginFinished = () => {
+      console.log("🧠 Reconocimiento facial terminado");
+      isFaceRecognitionActiveRef.current = false;
+      // No abrimos el micro aquí; lo abrimos al terminar el próximo speak
+      resumeAfterSpeechRef.current = true;
+    };
+
+    window.addEventListener("faceLoginFinished", handleFaceLoginFinished);
+
+    return () => {
+      window.removeEventListener(
+        "faceLoginFinished",
+        handleFaceLoginFinished
+      );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // =====================================================
   //  Cargar voces disponibles

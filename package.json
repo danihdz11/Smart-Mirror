@@ -1,0 +1,13 @@
+{
+  "name": "smart-mirror",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run back\" \"npm run front\" \"npm run mqtt\"",
+    "back": "cd backend && npm run dev",
+    "front": "cd frontend && npm run dev",
+    "mqtt": "cd backend/config && node mqtt-listener.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
