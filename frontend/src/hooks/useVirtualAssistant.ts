@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { transcribeAudio, synthesizeSpeech } from "../services/api";
+import { transcribeAudio } from "../services/api"; // 👈 ya no usamos synthesizeSpeech
 import {
   handleVoiceCommands,
   type CommandContext,
@@ -185,7 +185,6 @@ export function useVirtualAssistant() {
         );
         isWaitingForAnswerRef.current = false;
 
-        // 🔇 Apagamos el micrófono y marcamos reconocimiento facial activo
         stopListening();
         isFaceRecognitionActiveRef.current = true;
 
@@ -241,10 +240,6 @@ export function useVirtualAssistant() {
     if (handled) {
       return;
     }
-
-    // ===========================
-    // 3) Lógica extra local (si quieres)
-    // ===========================
   };
 
   // =====================================================
@@ -258,7 +253,6 @@ export function useVirtualAssistant() {
       isListening
     );
 
-    // ⛔ Bloqueo si está hablando o en reconocimiento facial
     if (isSpeakingRef.current || isFaceRecognitionActiveRef.current) {
       console.log(
         "⛔ No inicio escucha porque el asistente está hablando o en reconocimiento facial, lo programo para después"
@@ -503,7 +497,7 @@ export function useVirtualAssistant() {
   };
 
   // =====================================================
-  //  Hablar usando backend TTS (+ fallback)
+  //  Hablar usando SOLO speechSynthesis del navegador
   // =====================================================
   const speak = async (text: string): Promise<void> => {
     if (!text || text.trim().length === 0) {
@@ -514,55 +508,27 @@ export function useVirtualAssistant() {
     isSpeakingRef.current = true;
 
     return new Promise<void>((resolve) => {
-      (async () => {
-        const onFinish = () => {
-          console.log("🔚 Fin de speak()");
-          isSpeakingRef.current = false;
+      const onFinish = () => {
+        console.log("🔚 Fin de speak()");
+        isSpeakingRef.current = false;
 
-          // Si venimos de reconocimiento facial:
-          if (resumeAfterSpeechRef.current) {
-            resumeAfterSpeechRef.current = false;
-            startListening();
-            resolve();
-            return;
-          }
-
-          // Caso general
-          if (pendingStartListeningRef.current) {
-            pendingStartListeningRef.current = false;
-            startListening();
-          }
-
+        if (resumeAfterSpeechRef.current) {
+          resumeAfterSpeechRef.current = false;
+          startListening();
           resolve();
-        };
-
-        try {
-          console.log("Generando audio con backend TTS...");
-          const audioBlob = await synthesizeSpeech(text, "es");
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-
-          audio.onended = () => {
-            console.log("Terminó de hablar");
-            URL.revokeObjectURL(audioUrl);
-            onFinish();
-          };
-
-          audio.onerror = (error) => {
-            console.error("Error al reproducir audio:", error);
-            URL.revokeObjectURL(audioUrl);
-            fallbackToSpeechSynthesisWithCallback(text, onFinish);
-          };
-
-          await audio.play();
-        } catch (error) {
-          console.error(
-            "Error al generar audio con backend, usando fallback:",
-            error
-          );
-          fallbackToSpeechSynthesisWithCallback(text, onFinish);
+          return;
         }
-      })();
+
+        if (pendingStartListeningRef.current) {
+          pendingStartListeningRef.current = false;
+          startListening();
+        }
+
+        resolve();
+      };
+
+      // 🔊 Usamos directamente el TTS del navegador (más humano en Chrome/Edge)
+      fallbackToSpeechSynthesisWithCallback(text, onFinish);
     });
   };
 
@@ -572,7 +538,7 @@ export function useVirtualAssistant() {
   ) => {
     if (!("speechSynthesis" in window)) {
       console.warn(
-        "Tu navegador no soporta síntesis de voz y el backend falló"
+        "Tu navegador no soporta síntesis de voz (speechSynthesis)"
       );
       if (callback) callback();
       return;
@@ -581,21 +547,35 @@ export function useVirtualAssistant() {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
+
+    // 🧠 Parámetros más humanos
     utterance.lang = "es-MX";
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = 0.96;  // un poco más lento
+    utterance.pitch = 1.02; // leve variación de tono
     utterance.volume = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    const spanishVoice = voices.find(
-      (voice) => voice.lang.includes("es") || voice.lang.includes("ES")
-    );
-    if (spanishVoice) {
-      utterance.voice = spanishVoice;
+
+    // Prioridades: voz femenina de México → cualquier voz es-MX → cualquier español
+    const preferredNames = [
+  "Microsoft Helena - Spanish (Spain)",
+    ];
+
+    let selectedVoice =
+      voices.find((v) => preferredNames.includes(v.name)) ||
+      voices.find((v) => v.lang === "es-MX") ||
+      voices.find((v) => v.lang === "es-mx") ||
+      voices.find((v) => v.lang.toLowerCase().startsWith("es"));
+
+    if (selectedVoice) {
+      console.log("Usando voz:", selectedVoice.name, selectedVoice.lang);
+      utterance.voice = selectedVoice;
+    } else {
+      console.warn("No encontré voz en español, usando la predeterminada");
     }
 
     utterance.onend = () => {
-      console.log("Terminó de hablar (usando fallback)");
+      console.log("Terminó de hablar (speechSynthesis)");
       if (callback) callback();
     };
 
@@ -687,7 +667,7 @@ export function useVirtualAssistant() {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-        speak("a");
+        speak("");
 
         setTimeout(() => {
           if (checkUser()) {
@@ -718,7 +698,7 @@ export function useVirtualAssistant() {
       const timer = setTimeout(() => {
         console.log("Haciendo pregunta: ¿Deseas iniciar sesión?");
         speak(
-          "¿Deseas iniciar sesión? Responde si en ingles o claro para leer tu rostro, o no para continuar sin iniciar sesión"
+          "¿Deseas iniciar sesión? Responde sí en inglés o claro para leer tu rostro, o no para continuar sin iniciar sesión."
         );
 
         setTimeout(() => {
@@ -740,7 +720,6 @@ export function useVirtualAssistant() {
       hasAskedLoginRef.current = false;
       isWaitingForAnswerRef.current = false;
 
-      // 🔓 Reseteo de cualquier estado colgado de reconocimiento
       isFaceRecognitionActiveRef.current = false;
       resumeAfterSpeechRef.current = false;
       pendingStartListeningRef.current = false;
@@ -806,7 +785,6 @@ export function useVirtualAssistant() {
     const handleFaceLoginFinished = () => {
       console.log("🧠 Reconocimiento facial terminado");
       isFaceRecognitionActiveRef.current = false;
-      // No abrimos el micro aquí; lo abrimos al terminar el próximo speak
       resumeAfterSpeechRef.current = true;
     };
 
@@ -826,7 +804,11 @@ export function useVirtualAssistant() {
   // =====================================================
   useEffect(() => {
     const loadVoices = () => {
-      window.speechSynthesis.getVoices();
+      const voices = window.speechSynthesis.getVoices();
+      console.log("Voces disponibles:", voices.map((v) => ({
+        name: v.name,
+        lang: v.lang,
+      })));
     };
 
     loadVoices();
