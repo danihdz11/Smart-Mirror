@@ -6,7 +6,8 @@ import {
   type CommandContext,
 } from "./voice/voiceCommands";
 
-export function useVirtualAssistant() {
+
+export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,12 +27,49 @@ export function useVirtualAssistant() {
   const recordingIntervalRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
 
+  // 🔊 Saber si el bot está hablando
+  const isSpeakingRef = useRef(false);
+  // 🔁 Guardar si alguien quiso empezar a escuchar mientras hablaba
+  const pendingStartListeningRef = useRef(false);
+
   // =====================================================
   //  Helpers para flags
   // =====================================================
   const resetWelcomeFlags = () => {
     hasWelcomedToProfileRef.current = false;
     hasGreetedRef.current = false;
+  };
+
+  // 🔔 Sonidito cuando ya puede hablar el usuario
+  const playReadySound = () => {
+    try {
+      const AudioCtx =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // tono agudo
+
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+
+      osc.onended = () => {
+        ctx.close();
+      };
+    } catch (e) {
+      console.error("No se pudo reproducir el beep de listo para hablar:", e);
+    }
   };
 
   // =====================================================
@@ -190,6 +228,9 @@ export function useVirtualAssistant() {
       startListening,
       fetchNewsAndRead,
       resetWelcomeFlags,
+      refreshTasks: () => {
+        options?.onTasksChanged?.();
+      },
     };
 
     const handled = handleVoiceCommands(normalizedTranscript, ctx);
@@ -202,8 +243,6 @@ export function useVirtualAssistant() {
     // ===========================
     // 3) (Opcional) Lógica extra local
     // ===========================
-    // Aquí podrías agregar lógica muy específica que NO quieras
-    // mover al archivo externo.
   };
 
   // =====================================================
@@ -217,12 +256,24 @@ export function useVirtualAssistant() {
       isListening
     );
 
+    // ⛔ Si el bot está hablando, programamos la escucha para después
+    if (isSpeakingRef.current) {
+      console.log(
+        "⛔ No inicio escucha porque el asistente está hablando, la programo para después"
+      );
+      pendingStartListeningRef.current = true;
+      return;
+    }
+
     if (isProcessingRef.current || isListening) {
       console.log(
         "⛔ startListening abortado porque ya está procesando o escuchando"
       );
       return;
     }
+
+    // 🔔 Justo cuando empezamos a escuchar, avisamos con un beep
+    playReadySound();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -458,6 +509,12 @@ export function useVirtualAssistant() {
       return Promise.resolve();
     }
 
+    // 🔇 Siempre que el bot hable, apagamos el micrófono
+    stopListening();
+    isSpeakingRef.current = true;
+    // limpiamos cualquier intento previo
+    pendingStartListeningRef.current = false;
+
     return new Promise<void>((resolve) => {
       (async () => {
         try {
@@ -470,13 +527,30 @@ export function useVirtualAssistant() {
           audio.onended = () => {
             console.log("Terminó de hablar");
             URL.revokeObjectURL(audioUrl);
+
+            isSpeakingRef.current = false;
+
+            // Si alguien pidió escuchar mientras hablaba, empezamos ahora
+            if (pendingStartListeningRef.current) {
+              pendingStartListeningRef.current = false;
+              startListening();
+            }
+
             resolve();
           };
 
           audio.onerror = (error) => {
             console.error("Error al reproducir audio:", error);
             URL.revokeObjectURL(audioUrl);
-            fallbackToSpeechSynthesisWithCallback(text, resolve);
+            // Pasamos al fallback, pero encerrando la lógica de fin
+            fallbackToSpeechSynthesisWithCallback(text, () => {
+              isSpeakingRef.current = false;
+              if (pendingStartListeningRef.current) {
+                pendingStartListeningRef.current = false;
+                startListening();
+              }
+              resolve();
+            });
           };
 
           await audio.play();
@@ -485,7 +559,14 @@ export function useVirtualAssistant() {
             "Error al generar audio con backend, usando fallback:",
             error
           );
-          fallbackToSpeechSynthesisWithCallback(text, resolve);
+          fallbackToSpeechSynthesisWithCallback(text, () => {
+            isSpeakingRef.current = false;
+            if (pendingStartListeningRef.current) {
+              pendingStartListeningRef.current = false;
+              startListening();
+            }
+            resolve();
+          });
         }
       })();
     });
@@ -529,7 +610,7 @@ export function useVirtualAssistant() {
   };
 
   // =====================================================
-  //  Noticias (ahora se auto-protege con isReadingNewsRef)
+  //  Noticias
   // =====================================================
   const fetchNewsAndRead = async () => {
     if (isReadingNewsRef.current) {
