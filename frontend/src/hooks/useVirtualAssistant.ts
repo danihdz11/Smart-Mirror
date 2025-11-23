@@ -35,6 +35,9 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   const isFaceRecognitionActiveRef = useRef(false);
   const resumeAfterSpeechRef = useRef(false);
 
+  // ⏱ Timeout para “salir”
+  const muteTimeoutRef = useRef<number | null>(null);
+
   // =====================================================
   //  Helpers para flags
   // =====================================================
@@ -80,6 +83,11 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   // =====================================================
   const processTranscript = (transcript: string, confidence: number = 1.0) => {
     const normalizedTranscript = transcript.toLowerCase().trim();
+    const normalizedSimple = normalizedTranscript
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
 
     console.log("Escuché:", normalizedTranscript);
     console.log("Confianza:", confidence);
@@ -224,7 +232,37 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     }
 
     // ===========================
-    // 2) DELEGAR A ARCHIVO DE COMANDOS
+    // 2) COMANDO GLOBAL "salir"
+    // ===========================
+    if (normalizedSimple === "salir") {
+      console.log(
+        "🛑 Comando global 'salir' detectado: cerrar sesión y mutear 20 segundos"
+      );
+
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
+
+      stopListening();
+
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+
+      navigate("/mirror");
+
+      speak("Cerrando sesión. Volveré a escucharte en unos segundos.");
+
+      muteTimeoutRef.current = window.setTimeout(() => {
+        console.log("⏰ 20 segundos terminados, reactivando escucha");
+        startListening();
+      }, 20000);
+
+      return;
+    }
+
+    // ===========================
+    // 3) DELEGAR A ARCHIVO DE COMANDOS
     // ===========================
     const ctx: CommandContext = {
       locationPath: location.pathname,
@@ -274,6 +312,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       return;
     }
 
+    // 🔔 Beep de listo para hablar
     playReadySound();
 
     try {
@@ -503,41 +542,70 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   };
 
   // =====================================================
-  //  Hablar usando SOLO speechSynthesis del navegador
+  //  Hablar (speechSynthesis o backend espeak-ng)
   // =====================================================
-const speak = async (text: string): Promise<void> => {
-  if (!text || text.trim().length === 0) return;
+  const speak = async (text: string): Promise<void> => {
+    if (!text || text.trim().length === 0) {
+      return Promise.resolve();
+    }
 
-  stopListening();
+    stopListening();
+    isSpeakingRef.current = true;
+    pendingStartListeningRef.current = false;
 
-  const voices = window.speechSynthesis.getVoices();
+    return new Promise<void>((resolve) => {
+      const onFinish = () => {
+        console.log("🔚 Fin de speak()");
+        isSpeakingRef.current = false;
 
-  // 👉 Si hay voces (PC/Mac), usa speechSynthesis
-  if (voices && voices.length > 0) {
-    return new Promise((resolve) => {
-      fallbackToSpeechSynthesisWithCallback(text, () => {
+        if (resumeAfterSpeechRef.current) {
+          resumeAfterSpeechRef.current = false;
+          startListening();
+        } else if (pendingStartListeningRef.current) {
+          pendingStartListeningRef.current = false;
+          startListening();
+        }
+
         resolve();
-        startListening();
-      });
+      };
+
+      const voices =
+        (window.speechSynthesis &&
+          window.speechSynthesis.getVoices &&
+          window.speechSynthesis.getVoices()) ||
+        [];
+
+      if (voices.length > 0) {
+        console.log("🗣 Usando speechSynthesis del navegador");
+        fallbackToSpeechSynthesisWithCallback(text, onFinish);
+        return;
+      }
+
+      console.warn(
+        "⚠️ No hay voces en esta plataforma, usando backend TTS (espeak-ng)"
+      );
+      speakViaBackend(text, onFinish);
     });
-  }
+  };
 
-  console.warn("⚠️ No hay voces en esta plataforma, usando backend TTS (espeak-ng)");
+  const speakViaBackend = async (text: string, callback?: () => void) => {
+    try {
+      await fetch("http://localhost:5001/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    } catch (e) {
+      console.error("Error llamando a /api/speak:", e);
+    } finally {
+      const words = text.split(/\s+/).filter(Boolean).length;
+      const estimatedMs = Math.max(words * 350, 1200); // ~0.35s por palabra
 
-  // 👉 Si NO hay voces (Raspberry), usa backend
-  await fetch("http://localhost:5001/api/speak", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
-
-  // darle tiempo para hablar
-  setTimeout(() => {
-    startListening();
-  }, 800);
-};
-
-
+      window.setTimeout(() => {
+        if (callback) callback();
+      }, estimatedMs);
+    }
+  };
 
   const fallbackToSpeechSynthesisWithCallback = (
     text: string,
@@ -555,27 +623,33 @@ const speak = async (text: string): Promise<void> => {
 
     const utterance = new SpeechSynthesisUtterance(text);
 
-    // Parámetros
-    utterance.lang = "es-MX";
     utterance.rate = 0.96;
     utterance.pitch = 1.02;
     utterance.volume = 1.0;
 
-    const voices = window.speechSynthesis.getVoices();
+    let voices = window.speechSynthesis.getVoices() || [];
 
-    const preferredNames = ["Microsoft Helena - Spanish (Spain)"];
+    if (!voices || voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        voices = window.speechSynthesis.getVoices() || [];
+        console.log(
+          "Voces cargadas tras voiceschanged:",
+          voices.map((v) => ({ name: v.name, lang: v.lang }))
+        );
+      };
+    }
 
-    let selectedVoice =
-      voices.find((v) => preferredNames.includes(v.name)) ||
-      voices.find((v) => v.lang === "es-MX") ||
-      voices.find((v) => v.lang === "es-mx") ||
-      voices.find((v) => v.lang.toLowerCase().startsWith("es"));
+    const selectedVoice =
+      voices.find((v) => v.lang.toLowerCase().startsWith("es")) || voices[0];
 
     if (selectedVoice) {
       console.log("Usando voz:", selectedVoice.name, selectedVoice.lang);
       utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
     } else {
-      console.warn("No encontré voz en español, usando la predeterminada");
+      console.warn(
+        "⚠️ No hay ninguna voz disponible, speechSynthesis no podrá reproducir audio"
+      );
     }
 
     utterance.onend = () => {
@@ -655,6 +729,10 @@ const speak = async (text: string): Promise<void> => {
   useEffect(() => {
     return () => {
       stopListening();
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -671,9 +749,6 @@ const speak = async (text: string): Promise<void> => {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-
-        // Aquí podrías decir algo si quieres:
-        // speak("Hola, soy tu asistente. Puedes pedirme ayuda cuando quieras.");
 
         setTimeout(() => {
           if (checkUser()) {
@@ -806,7 +881,7 @@ const speak = async (text: string): Promise<void> => {
   }, []);
 
   // =====================================================
-  //  Cargar voces disponibles
+  //  Cargar voces disponibles (para debug en PC)
   // =====================================================
   useEffect(() => {
     const loadVoices = () => {
