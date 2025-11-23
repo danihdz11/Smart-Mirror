@@ -35,6 +35,9 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   const isFaceRecognitionActiveRef = useRef(false);
   const resumeAfterSpeechRef = useRef(false);
 
+  // ⏱ Timeout para “salir”
+  const muteTimeoutRef = useRef<number | null>(null);
+
   // =====================================================
   //  Helpers para flags
   // =====================================================
@@ -80,6 +83,11 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   // =====================================================
   const processTranscript = (transcript: string, confidence: number = 1.0) => {
     const normalizedTranscript = transcript.toLowerCase().trim();
+    const normalizedSimple = normalizedTranscript
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
 
     console.log("Escuché:", normalizedTranscript);
     console.log("Confianza:", confidence);
@@ -224,7 +232,43 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     }
 
     // ===========================
-    // 2) DELEGAR A ARCHIVO DE COMANDOS
+    // 2) COMANDO GLOBAL "salir"
+    // ===========================
+    if (normalizedSimple === "salir") {
+      console.log(
+        "🛑 Comando global 'salir' detectado: cerrar sesión y mutear 20 segundos"
+      );
+
+      // limpiamos timeout previo si hubiera
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
+
+      // detener escucha
+      stopListening();
+
+      // cerrar sesión
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+
+      // navegar a /mirror sin usuario logueado
+      navigate("/mirror");
+
+      // mensaje opcional
+      speak("Cerrando sesión. Volveré a escucharte en unos segundos.");
+
+      // mutear 20 segundos y luego reactivar escucha (se reproduce el beep)
+      muteTimeoutRef.current = window.setTimeout(() => {
+        console.log("⏰ 20 segundos terminados, reactivando escucha");
+        startListening(); // esto llama a playReadySound() → beep
+      }, 20000);
+
+      return;
+    }
+
+    // ===========================
+    // 3) DELEGAR A ARCHIVO DE COMANDOS
     // ===========================
     const ctx: CommandContext = {
       locationPath: location.pathname,
@@ -274,6 +318,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       return;
     }
 
+    // 🔔 Beep de listo para hablar
     playReadySound();
 
     try {
@@ -651,6 +696,10 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   useEffect(() => {
     return () => {
       stopListening();
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -667,9 +716,6 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-
-        // Aquí podrías decir algo si quieres:
-        // speak("Hola, soy tu asistente. Puedes pedirme ayuda cuando quieras.");
 
         setTimeout(() => {
           if (checkUser()) {
