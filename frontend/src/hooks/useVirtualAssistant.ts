@@ -244,8 +244,6 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     if (handled) {
       return;
     }
-
-    // Aquí podrías meter lógica adicional si ningún comando se activó
   };
 
   // =====================================================
@@ -274,8 +272,8 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       return;
     }
 
-    // 👇 OJO: ya no llamamos playReadySound() aquí,
-    // el beep ahora se dispara cuando *termina* de hablar el bot (en speak/finish)
+    // ✅ Aquí SÍ suena el beep justo cuando realmente vamos a escuchar
+    playReadySound();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -520,23 +518,17 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       console.log("🔚 Fin de speak()");
       isSpeakingRef.current = false;
 
-      const startAfter = () => {
-        // 🔔 Siempre que realmente volvemos a escuchar al usuario → beep
-        playReadySound();
-        startListening();
-      };
-
       // Si venimos de reconocimiento facial
       if (resumeAfterSpeechRef.current) {
         resumeAfterSpeechRef.current = false;
-        startAfter();
+        startListening(); // aquí se disparará el beep
         return;
       }
 
-      // Caso general: alguien pidió reanudar escucha tras hablar
+      // Caso general
       if (pendingStartListeningRef.current) {
         pendingStartListeningRef.current = false;
-        startAfter();
+        startListening(); // aquí también sonará el beep
       }
     };
 
@@ -726,9 +718,6 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-
-        // Aquí podrías decir algo si quieres:
-        // speak("Hola, soy tu asistente. Puedes pedirme ayuda cuando quieras.");
 
         setTimeout(() => {
           if (checkUser()) {
