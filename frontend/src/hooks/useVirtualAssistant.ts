@@ -1,12 +1,13 @@
+// src/hooks/useVirtualAssistant.ts
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { transcribeAudio } from "../services/api"; // 👈 ya no usamos synthesizeSpeech
+import { transcribeAudio } from "../services/api";
 import {
   handleVoiceCommands,
   type CommandContext,
 } from "./voice/voiceCommands";
 
-export function useVirtualAssistant() {
+export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -233,6 +234,9 @@ export function useVirtualAssistant() {
       startListening,
       fetchNewsAndRead,
       resetWelcomeFlags,
+      refreshTasks: () => {
+        options?.onTasksChanged?.();
+      },
     };
 
     const handled = handleVoiceCommands(normalizedTranscript, ctx);
@@ -240,6 +244,8 @@ export function useVirtualAssistant() {
     if (handled) {
       return;
     }
+
+    // Aquí podrías meter lógica adicional si ningún comando se activó
   };
 
   // =====================================================
@@ -504,8 +510,10 @@ export function useVirtualAssistant() {
       return Promise.resolve();
     }
 
+    // 🔇 Siempre que el bot hable, apagamos el micrófono
     stopListening();
     isSpeakingRef.current = true;
+    pendingStartListeningRef.current = false;
 
     return new Promise<void>((resolve) => {
       const onFinish = () => {
@@ -515,11 +523,7 @@ export function useVirtualAssistant() {
         if (resumeAfterSpeechRef.current) {
           resumeAfterSpeechRef.current = false;
           startListening();
-          resolve();
-          return;
-        }
-
-        if (pendingStartListeningRef.current) {
+        } else if (pendingStartListeningRef.current) {
           pendingStartListeningRef.current = false;
           startListening();
         }
@@ -527,7 +531,6 @@ export function useVirtualAssistant() {
         resolve();
       };
 
-      // 🔊 Usamos directamente el TTS del navegador (más humano en Chrome/Edge)
       fallbackToSpeechSynthesisWithCallback(text, onFinish);
     });
   };
@@ -548,18 +551,15 @@ export function useVirtualAssistant() {
 
     const utterance = new SpeechSynthesisUtterance(text);
 
-    // 🧠 Parámetros más humanos
+    // Parámetros
     utterance.lang = "es-MX";
-    utterance.rate = 0.96;  // un poco más lento
-    utterance.pitch = 1.02; // leve variación de tono
+    utterance.rate = 0.96;
+    utterance.pitch = 1.02;
     utterance.volume = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
 
-    // Prioridades: voz femenina de México → cualquier voz es-MX → cualquier español
-    const preferredNames = [
-  "Microsoft Helena - Spanish (Spain)",
-    ];
+    const preferredNames = ["Microsoft Helena - Spanish (Spain)"];
 
     let selectedVoice =
       voices.find((v) => preferredNames.includes(v.name)) ||
@@ -667,7 +667,9 @@ export function useVirtualAssistant() {
     const timer = setTimeout(() => {
       if (!hasGreetedRef.current && checkUser()) {
         hasGreetedRef.current = true;
-        speak("");
+
+        // Aquí podrías decir algo si quieres:
+        // speak("Hola, soy tu asistente. Puedes pedirme ayuda cuando quieras.");
 
         setTimeout(() => {
           if (checkUser()) {
@@ -805,10 +807,13 @@ export function useVirtualAssistant() {
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
-      console.log("Voces disponibles:", voices.map((v) => ({
-        name: v.name,
-        lang: v.lang,
-      })));
+      console.log(
+        "Voces disponibles:",
+        voices.map((v) => ({
+          name: v.name,
+          lang: v.lang,
+        }))
+      );
     };
 
     loadVoices();

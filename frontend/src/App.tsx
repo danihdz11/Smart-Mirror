@@ -15,17 +15,23 @@ import AuthButtons from "./widgets/authButtons/authButtons";
 import AddTaskWidget from "./widgets/addTaskWidget/addTaskWidget";
 import { useVirtualAssistant } from "./hooks/useVirtualAssistant";
 
+type VirtualAssistantInitializerProps = {
+  onTasksChanged: () => void;
+};
+
 // Componente para inicializar el asistente virtual
-function VirtualAssistantInitializer() {
-  useVirtualAssistant();
+function VirtualAssistantInitializer({ onTasksChanged }: VirtualAssistantInitializerProps) {
+  useVirtualAssistant({ onTasksChanged });
   return null;
 }
 
+
 function App() {
-  const [refreshTasks, setRefreshTasks] = useState(0);
+  const [refresh, setRefresh] = useState(0);
+
   return (
     <BrowserRouter>
-      <VirtualAssistantInitializer />
+      <VirtualAssistantInitializer onTasksChanged={() => setRefresh((prev) => prev + 1)} />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -50,11 +56,11 @@ function App() {
               {/* Widgets derechos */}
               <div className="absolute top-16 right-6 flex flex-col gap-4 items-end pointer-events-auto">
                 <WeatherWidget />
-                <ToDoWidget refresh={refreshTasks}/>
+                <ToDoWidget refresh={refresh}/>
                 {/* <QuoteWidget /> */}
               </div>
 
-              <AddTaskWidget onTaskAdded={() => setRefreshTasks((prev) => prev + 1)}/>
+              <AddTaskWidget onTaskAdded={() => setRefresh((prev) => prev + 1)}/>
             </MirrorView>
           }
         />

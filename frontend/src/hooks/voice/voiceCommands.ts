@@ -10,6 +10,7 @@ export type CommandContext = {
   startListening: () => void;
   fetchNewsAndRead: () => Promise<void> | void;
   resetWelcomeFlags: () => void;
+  refreshTasks?: () => void;
 };
 
 export type VoiceCommand = {
@@ -23,6 +24,123 @@ export type VoiceCommand = {
 // ============================
 
 const voiceCommands: VoiceCommand[] = [
+  // Agregar tarea
+  {
+    name: "agregar_tarea",
+    match: (normalized, _ctx) => {
+      const clean = normalized
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      // Frases que activan el comando
+      return (
+        clean.startsWith("agrega tarea") ||
+        clean.startsWith("agregar tarea") ||
+        clean.startsWith("añade tarea") ||
+        clean.startsWith("anade tarea") || // por si falla la ñ
+        clean.startsWith("nueva tarea")
+      );
+    },
+    execute: async (normalized, ctx) => {
+      ctx.stopListening();
+
+      // ======================
+      // 1) Limpiar texto y extraer título
+      // ======================
+      const clean = normalized
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+      const triggers = [
+        "agrega tarea",
+        "agregar tarea",
+        "añade tarea",
+        "anade tarea",
+        "nueva tarea",
+      ];
+
+      let title = "";
+
+      for (const t of triggers) {
+        if (clean.startsWith(t)) {
+          title = clean.substring(t.length).trim();
+          break;
+        }
+      }
+
+      if (!title) {
+        await ctx.speak(
+          "Para guardar una tarea, di por ejemplo: agrega tarea comprar leche."
+        );
+        setTimeout(() => ctx.startListening(), 1000);
+        return;
+      }
+
+      // ======================
+      // 2) Obtener usuario
+      // ======================
+      let userId: string | null = null;
+
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          userId = user.id || user._id; // depende de cómo lo guardes
+        }
+      } catch (err) {
+        console.error("Error leyendo usuario:", err);
+      }
+
+      if (!userId) {
+        await ctx.speak("No encontré un usuario activo. Inicia sesión primero.");
+        setTimeout(() => ctx.startListening(), 1000);
+        return;
+      }
+
+      // ======================
+      // 3) Hacer POST al backend
+      // ======================
+      try {
+        const res = await fetch("http://localhost:5001/api/tasks/add", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId,
+            title,
+            date: null,
+            time: null,
+            repeat: "none",
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          console.error("Error al agregar tarea:", data);
+          await ctx.speak("No pude guardar la tarea, intenta de nuevo.");
+        } else {
+          console.log("Tarea agregada:", data);
+          await ctx.speak(`He guardado la tarea: ${title}.`);
+
+          // Si conectas esto con tu widget:
+          if (ctx.refreshTasks) {
+            ctx.refreshTasks();
+          }
+        }
+      } catch (err) {
+        console.error("Error de red al agregar tarea:", err);
+        await ctx.speak("Hubo un problema con el servidor de tareas.");
+      }
+
+      setTimeout(() => ctx.startListening(), 1000);
+    },
+  },
+
   // 📰 Leer noticias en /mirror
   {
     name: "leer_noticias",
