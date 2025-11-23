@@ -13,41 +13,158 @@ export type CommandContext = {
   refreshTasks?: () => void;
 };
 
+type PendingTaskState = {
+  step: "awaitingTitle" | "awaitingDate";
+  tempTitle?: string;
+};
+
+let pendingTask: PendingTaskState | null = null;
+
+
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0"); // 0-11
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateFromText(text: string): string | null {
+  const now = new Date();
+
+  let clean = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quita acentos -> mañana => manana
+    .toLowerCase()
+    .trim();
+
+  // sin fecha
+  if (clean.includes("sin fecha")) {
+    return null;
+  }
+
+  // hoy
+  if (clean.includes("hoy")) {
+    return formatLocalDate(now);
+  }
+
+  // pasado mañana (checar antes que "mañana")
+  if (clean.includes("pasado manana")) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 2);
+    return formatLocalDate(d);
+  }
+
+  // mañana
+  if (clean.includes("manana")) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    return formatLocalDate(d);
+  }
+
+  // formato dd/mm o dd-mm
+  const regexDdMm = /(\d{1,2})[\/\-](\d{1,2})/;
+  const m1 = clean.match(regexDdMm);
+  if (m1) {
+    const day = m1[1];
+    const month = m1[2];
+    const year = now.getFullYear();
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // formato yyyy-mm-dd
+  const regexIso = /(\d{4})-(\d{2})-(\d{2})/;
+  const m2 = clean.match(regexIso);
+  if (m2) {
+    return m2[0];
+  }
+
+  // no se entendió la fecha
+  return null;
+}
+
+
+
 export type VoiceCommand = {
   name: string;
   match: (normalized: string, ctx: CommandContext) => boolean;
   execute: (normalized: string, ctx: CommandContext) => Promise<void> | void;
 };
 
+function extractDateFromText(text: string) {
+  const now = new Date();
+
+  const format = (date: Date) => date.toISOString().split("T")[0];
+
+  let date: string | null = null;
+
+  // --- HOY ---
+  if (text.includes("hoy")) {
+    date = format(now);
+    text = text.replace("hoy", "").trim();
+  }
+
+  // --- MAÑANA ---
+  if (text.includes("mañana")) {
+    const d = new Date();
+    d.setDate(now.getDate() + 1);
+    date = format(d);
+    text = text.replace("mañana", "").trim();
+  }
+
+  // --- PASADO MAÑANA ---
+  if (text.includes("pasado mañana")) {
+    const d = new Date();
+    d.setDate(now.getDate() + 2);
+    date = format(d);
+    text = text.replace("pasado mañana", "").trim();
+  }
+
+  // --- FORMATO dd/mm ---
+  const regex1 = /(\d{1,2})\/(\d{1,2})/;
+  const match1 = text.match(regex1);
+  if (match1) {
+    const [_, d, m] = match1;
+    const year = now.getFullYear();
+    date = `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    text = text.replace(regex1, "").trim();
+  }
+
+  // --- FORMATO yyyy-mm-dd ---
+  const regex2 = /(\d{4})-(\d{2})-(\d{2})/;
+  const match2 = text.match(regex2);
+  if (match2) {
+    date = match2[0];
+    text = text.replace(regex2, "").trim();
+  }
+
+  return { title: text.trim(), date };
+}
+
 // ============================
 //  Lista de comandos
 // ============================
 
 const voiceCommands: VoiceCommand[] = [
-  // Agregar tarea
   {
-    name: "agregar_tarea",
+    name: "agregar_tarea_iniciar",
     match: (normalized, _ctx) => {
       const clean = normalized
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
+        .toLowerCase()
+        .trim();
 
-      // Frases que activan el comando
       return (
         clean.startsWith("agrega tarea") ||
         clean.startsWith("agregar tarea") ||
         clean.startsWith("añade tarea") ||
-        clean.startsWith("anade tarea") || // por si falla la ñ
+        clean.startsWith("anade tarea") ||
         clean.startsWith("nueva tarea")
       );
     },
     execute: async (normalized, ctx) => {
       ctx.stopListening();
 
-      // ======================
-      // 1) Limpiar texto y extraer título
-      // ======================
       const clean = normalized
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -62,57 +179,255 @@ const voiceCommands: VoiceCommand[] = [
         "nueva tarea",
       ];
 
-      let title = "";
-
+      let rest = clean;
       for (const t of triggers) {
-        if (clean.startsWith(t)) {
-          title = clean.substring(t.length).trim();
+        if (rest.startsWith(t)) {
+          rest = rest.slice(t.length).trim();
           break;
         }
       }
 
-      if (!title) {
-        await ctx.speak(
-          "Para guardar una tarea, di por ejemplo: agrega tarea comprar leche."
-        );
+      // Caso 1: solo dijo "agregar tarea"
+      if (!rest) {
+        pendingTask = { step: "awaitingTitle" };
+        await ctx.speak("¿Cuál es el nombre de la tarea?");
+        setTimeout(() => ctx.startListening(), 800);
+        return;
+      }
+
+      // Caso 2: dijo título en la misma frase
+      pendingTask = {
+        step: "awaitingDate",
+        tempTitle: rest, // ej. "comprar leche mañana" lo refinará el siguiente paso
+      };
+
+      await ctx.speak(
+        `Entendido. La tarea es: ${rest}. ¿Para qué fecha es esta tarea? Puedes decir hoy, mañana o una fecha como 25/02. Si no quieres fecha, di sin fecha.`
+      );
+      setTimeout(() => ctx.startListening(), 800);
+    },
+  },
+
+  {
+  name: "agregar_tarea_titulo",
+  match: (normalized, _ctx) => {
+    if (!pendingTask || pendingTask.step !== "awaitingTitle") return false;
+
+    const clean = normalized
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+    return clean.length > 0;
+  },
+  execute: async (normalized, ctx) => {
+    ctx.stopListening();
+
+    const title = normalized.trim();
+    pendingTask = {
+      step: "awaitingDate",
+      tempTitle: title,
+    };
+
+    await ctx.speak(
+      `Perfecto. Guardaré la tarea: ${title}. ¿Para qué fecha es esta tarea? Puedes decir hoy, mañana o una fecha como 25/02. Si no quieres fecha, di sin fecha.`
+    );
+
+    setTimeout(() => ctx.startListening(), 800);
+  },
+},
+
+  {
+  name: "agregar_tarea_fecha",
+  match: (normalized, _ctx) => {
+    if (!pendingTask || pendingTask.step !== "awaitingDate") return false;
+
+    const clean = normalized
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+    return clean.length > 0;
+  },
+  execute: async (normalized, ctx) => {
+    ctx.stopListening();
+
+    if (!pendingTask || !pendingTask.tempTitle) {
+      // algo se desincronizó, reiniciamos flujo
+      await ctx.speak(
+        "Algo salió mal al crear la tarea. Intenta de nuevo diciendo agregar tarea."
+      );
+      pendingTask = null;
+      setTimeout(() => ctx.startListening(), 1000);
+      return;
+    }
+
+    const title = pendingTask.tempTitle;
+    const rawDatePhrase = normalized;
+
+    // detectar fecha (o sin fecha)
+    const date = parseDateFromText(rawDatePhrase);
+
+    if (date === null && !rawDatePhrase.toLowerCase().includes("sin fecha")) {
+      await ctx.speak(
+        "No entendí la fecha. Intenta decir hoy, mañana, pasado mañana, una fecha como 25/02 o di sin fecha."
+      );
+      // seguimos en awaitingDate
+      setTimeout(() => ctx.startListening(), 1200);
+      return;
+    }
+
+    // obtener usuario
+    let userId: string | null = null;
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        userId = user.id || user._id;
+      }
+    } catch (e) {
+      console.error("Error leyendo usuario:", e);
+    }
+
+    if (!userId) {
+      await ctx.speak("Necesitas iniciar sesión para guardar tareas.");
+      pendingTask = null;
+      setTimeout(() => ctx.startListening(), 1000);
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5001/api/tasks/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          title,
+          date: date || null,
+          time: null,
+          repeat: "none",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Error al agregar tarea:", data);
+        await ctx.speak("No pude guardar la tarea, intenta de nuevo.");
+      } else {
+        if (date) {
+          await ctx.speak(
+            `He guardado la tarea: ${title} para la fecha ${date}.`
+          );
+        } else {
+          await ctx.speak(`He guardado la tarea: ${title} sin fecha.`);
+        }
+
+        if (ctx.refreshTasks) {
+          ctx.refreshTasks();
+        }
+      }
+    } catch (e) {
+      console.error("Error de red al agregar tarea:", e);
+      await ctx.speak("Hubo un problema con el servidor de tareas.");
+    }
+
+    pendingTask = null;
+    setTimeout(() => ctx.startListening(), 1000);
+  },
+},
+
+
+  // Agregar tarea
+  {
+    name: "agregar_tarea",
+
+    match: (normalized, _ctx) => {
+      const clean = normalized
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      return (
+        clean.startsWith("agrega tarea") ||
+        clean.startsWith("agregar tarea") ||
+        clean.startsWith("añade tarea") ||
+        clean.startsWith("anade tarea") ||
+        clean.startsWith("nueva tarea")
+      );
+    },
+
+    execute: async (normalized, ctx) => {
+      ctx.stopListening();
+
+      // ======================
+      // 1) Limpiar texto
+      // ======================
+      const clean = normalized
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().trim();
+
+      const triggers = [
+        "agrega tarea",
+        "agregar tarea",
+        "añade tarea",
+        "anade tarea",
+        "nueva tarea",
+      ];
+
+      let text = clean;
+      for (const t of triggers) {
+        if (text.startsWith(t)) {
+          text = text.slice(t.length).trim();
+        }
+      }
+
+      if (!text) {
+        await ctx.speak("Para guardar una tarea, di por ejemplo: agrega tarea comprar leche mañana.");
         setTimeout(() => ctx.startListening(), 1000);
         return;
       }
 
       // ======================
-      // 2) Obtener usuario
+      // 2) Extraer fecha
       // ======================
-      let userId: string | null = null;
+      const { title, date } = extractDateFromText(text);
 
+      // ======================
+      // 3) Obtener usuario
+      // ======================
+      let userId = null;
       try {
         const userStr = localStorage.getItem("user");
         if (userStr) {
           const user = JSON.parse(userStr);
-          userId = user.id || user._id; // depende de cómo lo guardes
+          userId = user.id || user._id;
         }
-      } catch (err) {
-        console.error("Error leyendo usuario:", err);
+      } catch (e) {
+        console.error("Error leyendo usuario:", e);
       }
 
       if (!userId) {
-        await ctx.speak("No encontré un usuario activo. Inicia sesión primero.");
+        await ctx.speak("Necesitas iniciar sesión para guardar tareas.");
         setTimeout(() => ctx.startListening(), 1000);
         return;
       }
 
       // ======================
-      // 3) Hacer POST al backend
+      // 4) Guardar la tarea
       // ======================
       try {
         const res = await fetch("http://localhost:5001/api/tasks/add", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId,
             title,
-            date: null,
+            date: date || null,
             time: null,
             repeat: "none",
           }),
@@ -124,13 +439,13 @@ const voiceCommands: VoiceCommand[] = [
           console.error("Error al agregar tarea:", data);
           await ctx.speak("No pude guardar la tarea, intenta de nuevo.");
         } else {
-          console.log("Tarea agregada:", data);
-          await ctx.speak(`He guardado la tarea: ${title}.`);
+          await ctx.speak(
+            date
+              ? `He guardado la tarea: ${title} para el ${date}.`
+              : `He guardado la tarea: ${title}.`
+          );
 
-          // Si conectas esto con tu widget:
-          if (ctx.refreshTasks) {
-            ctx.refreshTasks();
-          }
+          if (ctx.refreshTasks) ctx.refreshTasks();
         }
       } catch (err) {
         console.error("Error de red al agregar tarea:", err);
