@@ -141,6 +141,151 @@ const voiceCommands: VoiceCommand[] = [
     },
   },
 
+  // Eliminar tarea
+  {
+    name: "eliminar_tarea",
+    match: (normalized, _ctx) => {
+      const clean = normalized
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+      // Formato esperado: "eliminar tarea: {nombre}" (con o sin dos puntos)
+      return clean.startsWith("eliminar tarea");
+    },
+    execute: async (normalized, ctx) => {
+      ctx.stopListening();
+
+      // 1) Limpiar y extraer título
+      const clean = normalized
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+      // Quitar "eliminar tarea" + posibles ":" y espacios
+      let titleSpoken = clean.replace(/^eliminar tarea[:]?/i, "").trim();
+
+      if (!titleSpoken) {
+        await ctx.speak(
+          "Para borrar una tarea, di por ejemplo: eliminar tarea entregar proyecto de física."
+        );
+        setTimeout(() => ctx.startListening(), 1000);
+        return;
+      }
+
+      // 2) Obtener usuario
+      let userId: string | null = null;
+
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          userId = user.id || user._id;
+        }
+      } catch (err) {
+        console.error("Error leyendo usuario:", err);
+      }
+
+      if (!userId) {
+        await ctx.speak("No encontré un usuario activo. Inicia sesión primero.");
+        setTimeout(() => ctx.startListening(), 1000);
+        return;
+      }
+
+      // Helper para normalizar títulos
+      const normalizeTitle = (text: string) =>
+        text
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+
+      const target = normalizeTitle(titleSpoken);
+
+      try {
+        // 3) Traer tareas actuales
+        const tasksRes = await fetch(
+          `http://localhost:5001/api/tasks/${userId}`
+        );
+        const tasksData = await tasksRes.json();
+
+        if (!tasksRes.ok) {
+          console.error("Error obteniendo tareas:", tasksData);
+          await ctx.speak("No pude obtener tus tareas para borrarla.");
+          setTimeout(() => ctx.startListening(), 1000);
+          return;
+        }
+
+        const tasks = (tasksData.tasks || []) as { title: string }[];
+
+        if (tasks.length === 0) {
+          await ctx.speak("No tienes tareas para eliminar.");
+          setTimeout(() => ctx.startListening(), 1000);
+          return;
+        }
+
+        // 4) Buscar tarea por nombre
+        let index = tasks.findIndex(
+          (t) => normalizeTitle(t.title) === target
+        );
+
+        // Si no hay match exacto, intentar por "incluye"
+        if (index === -1) {
+          index = tasks.findIndex((t) =>
+            normalizeTitle(t.title).includes(target)
+          );
+        }
+
+        if (index === -1) {
+          await ctx.speak(
+            `No encontré ninguna tarea llamada ${titleSpoken}.`
+          );
+          setTimeout(() => ctx.startListening(), 1000);
+          return;
+        }
+
+        const titleToDelete = tasks[index].title;
+
+        // 5) Llamar al delete del backend
+        const deleteRes = await fetch(
+          "http://localhost:5001/api/tasks/delete",
+          {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId,
+              index,
+            }),
+          }
+        );
+
+        const deleteData = await deleteRes.json();
+
+        if (!deleteRes.ok) {
+          console.error("Error al eliminar tarea:", deleteData);
+          await ctx.speak("No pude eliminar la tarea, intenta de nuevo.");
+        } else {
+          await ctx.speak(`He eliminado la tarea: ${titleToDelete}.`);
+
+          if (ctx.refreshTasks) {
+            ctx.refreshTasks();
+          }
+        }
+      } catch (err) {
+        console.error("Error de red al eliminar tarea:", err);
+        await ctx.speak(
+          "Hubo un problema con el servidor al intentar eliminar la tarea."
+        );
+      }
+
+      setTimeout(() => ctx.startListening(), 1000);
+    },
+  },
+
   // 📰 Leer noticias en /mirror
   {
     name: "leer_noticias",
