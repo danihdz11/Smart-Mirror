@@ -55,7 +55,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       const gain = ctx.createGain();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // tono agudo
 
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
@@ -274,7 +274,8 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       return;
     }
 
-    playReadySound();
+    // 👇 OJO: ya no llamamos playReadySound() aquí,
+    // el beep ahora se dispara cuando *termina* de hablar el bot (en speak/finish)
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -503,83 +504,95 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   };
 
   // =====================================================
-  //  Hablar usando SOLO speechSynthesis del navegador
+  //  Hablar: backend TTS + fallback speechSynthesis
   // =====================================================
-// =====================================================
-//  Hablar: primero backend TTS, luego fallback speechSynthesis
-// =====================================================
-const speak = async (text: string): Promise<void> => {
-  if (!text || text.trim().length === 0) {
-    return Promise.resolve();
-  }
-
-  // 🔇 Siempre que el bot hable, apagamos el micrófono
-  stopListening();
-  isSpeakingRef.current = true;
-  pendingStartListeningRef.current = false;
-
-  const finish = () => {
-    console.log("🔚 Fin de speak()");
-    isSpeakingRef.current = false;
-
-    // Si venimos de reconocimiento facial
-    if (resumeAfterSpeechRef.current) {
-      resumeAfterSpeechRef.current = false;
-      startListening();
-      return;
+  const speak = async (text: string): Promise<void> => {
+    if (!text || text.trim().length === 0) {
+      return Promise.resolve();
     }
 
-    // Caso general
-    if (pendingStartListeningRef.current) {
-      pendingStartListeningRef.current = false;
-      startListening();
-    }
-  };
+    // 🔇 Siempre que el bot hable, apagamos el micrófono
+    stopListening();
+    isSpeakingRef.current = true;
+    pendingStartListeningRef.current = false;
 
-  try {
-    console.log("🔊 Intentando TTS del backend...");
-    const audioBlob = await synthesizeSpeech(text, "es");
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
+    const finish = () => {
+      console.log("🔚 Fin de speak()");
+      isSpeakingRef.current = false;
 
-    return await new Promise<void>((resolve) => {
-      audio.onended = () => {
-        console.log("Terminó de hablar (backend TTS)");
-        URL.revokeObjectURL(audioUrl);
-        finish();
-        resolve();
+      const startAfter = () => {
+        // 🔔 Siempre que realmente volvemos a escuchar al usuario → beep
+        playReadySound();
+        startListening();
       };
 
-      audio.onerror = (error) => {
-        console.error("Error al reproducir audio del backend, usando speechSynthesis:", error);
-        URL.revokeObjectURL(audioUrl);
-        fallbackToSpeechSynthesisWithCallback(text, () => {
+      // Si venimos de reconocimiento facial
+      if (resumeAfterSpeechRef.current) {
+        resumeAfterSpeechRef.current = false;
+        startAfter();
+        return;
+      }
+
+      // Caso general: alguien pidió reanudar escucha tras hablar
+      if (pendingStartListeningRef.current) {
+        pendingStartListeningRef.current = false;
+        startAfter();
+      }
+    };
+
+    try {
+      console.log("🔊 Intentando TTS del backend...");
+      const audioBlob = await synthesizeSpeech(text, "es");
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      return await new Promise<void>((resolve) => {
+        audio.onended = () => {
+          console.log("Terminó de hablar (backend TTS)");
+          URL.revokeObjectURL(audioUrl);
           finish();
           resolve();
-        });
-      };
+        };
 
-      audio
-        .play()
-        .catch((error) => {
-          console.error("Error al iniciar reproducción, usando speechSynthesis:", error);
+        audio.onerror = (error) => {
+          console.error(
+            "Error al reproducir audio del backend, usando speechSynthesis:",
+            error
+          );
           URL.revokeObjectURL(audioUrl);
           fallbackToSpeechSynthesisWithCallback(text, () => {
             finish();
             resolve();
           });
-        });
-    });
-  } catch (error) {
-    console.error("Error generando audio en backend, usando speechSynthesis:", error);
-    return new Promise<void>((resolve) => {
-      fallbackToSpeechSynthesisWithCallback(text, () => {
-        finish();
-        resolve();
+        };
+
+        audio
+          .play()
+          .catch((error) => {
+            console.error(
+              "Error al iniciar reproducción, usando speechSynthesis:",
+              error
+            );
+            URL.revokeObjectURL(audioUrl);
+            fallbackToSpeechSynthesisWithCallback(text, () => {
+              finish();
+              resolve();
+            });
+          });
       });
-    });
-  }
-};
+    } catch (error) {
+      console.error(
+        "Error generando audio en backend, usando speechSynthesis:",
+        error
+      );
+      return new Promise<void>((resolve) => {
+        fallbackToSpeechSynthesisWithCallback(text, () => {
+          finish();
+          resolve();
+        });
+      });
+    }
+  };
 
   const fallbackToSpeechSynthesisWithCallback = (
     text: string,
@@ -787,9 +800,7 @@ const speak = async (text: string): Promise<void> => {
           const user = JSON.parse(userFromStorage);
           const userName = user.name || "Usuario";
 
-          console.log(
-            `Usuario ${userName} entró a su perfil, saludando...`
-          );
+          console.log(`Usuario ${userName} entró a su perfil, saludando...`);
 
           stopListening();
           hasWelcomedToProfileRef.current = true;
