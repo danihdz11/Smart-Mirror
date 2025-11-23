@@ -11,14 +11,21 @@ router.post("/", (req, res) => {
     return res.status(400).json({ ok: false, error: "Texto vacío" });
   }
 
-  // Voz grave latinoamericana: es-419, velocidad 135, pitch 30
-  const cmd = `espeak-ng -v es-419 -s 135 -p 30 "${text}"`;
+  // 👇 Ajusta esta ruta con lo que te dio `which espeak-ng`
+  const espeakPath = "/usr/bin/espeak-ng";
 
-  exec(cmd, (error) => {
+  const cmd = `${espeakPath} -v es-419 -s 135 -p 30 "${text}"`;
+
+  console.log("🗣️ Ejecutando comando TTS:", cmd);
+
+  exec(cmd, (error, stdout, stderr) => {
     if (error) {
-      console.error("Error en espeak-ng:", error);
-      return res.status(500).json({ ok: false });
+      console.error("❌ Error en espeak-ng:", error);
+      console.error("STDERR:", stderr);
+      return res.status(500).json({ ok: false, error: "espeak-ng failed" });
     }
+
+    console.log("✅ espeak-ng STDOUT:", stdout);
     return res.json({ ok: true });
   });
 });
