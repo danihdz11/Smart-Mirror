@@ -5,7 +5,15 @@
     "dev": "concurrently \"npm run back\" \"npm run front\" \"npm run mqtt\"",
     "back": "cd backend && npm run dev",
     "front": "cd frontend && npm run dev",
-    "mqtt": "cd backend/config && node mqtt-listener.js"
+    "mqtt": "cd backend/config && node mqtt-listener.js",
+
+    "build:front": "cd frontend && npm run build",
+
+    "serve:front": "cd frontend && npm run serve:prod",
+    "serve:back": "cd backend && npm start",
+    "serve:mqtt": "cd backend/config && node mqtt-listener.js",
+
+    "start:prod": "concurrently \"npm run serve:back\" \"npm run serve:front\" \"npm run serve:mqtt\""
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
