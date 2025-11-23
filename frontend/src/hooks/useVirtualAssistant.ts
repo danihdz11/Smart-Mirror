@@ -1,7 +1,7 @@
 // src/hooks/useVirtualAssistant.ts
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { transcribeAudio } from "../services/api";
+import { transcribeAudio, synthesizeSpeech } from "../services/api";
 import {
   handleVoiceCommands,
   type CommandContext,
@@ -505,35 +505,81 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   // =====================================================
   //  Hablar usando SOLO speechSynthesis del navegador
   // =====================================================
-  const speak = async (text: string): Promise<void> => {
-    if (!text || text.trim().length === 0) {
-      return Promise.resolve();
+// =====================================================
+//  Hablar: primero backend TTS, luego fallback speechSynthesis
+// =====================================================
+const speak = async (text: string): Promise<void> => {
+  if (!text || text.trim().length === 0) {
+    return Promise.resolve();
+  }
+
+  // 🔇 Siempre que el bot hable, apagamos el micrófono
+  stopListening();
+  isSpeakingRef.current = true;
+  pendingStartListeningRef.current = false;
+
+  const finish = () => {
+    console.log("🔚 Fin de speak()");
+    isSpeakingRef.current = false;
+
+    // Si venimos de reconocimiento facial
+    if (resumeAfterSpeechRef.current) {
+      resumeAfterSpeechRef.current = false;
+      startListening();
+      return;
     }
 
-    // 🔇 Siempre que el bot hable, apagamos el micrófono
-    stopListening();
-    isSpeakingRef.current = true;
-    pendingStartListeningRef.current = false;
+    // Caso general
+    if (pendingStartListeningRef.current) {
+      pendingStartListeningRef.current = false;
+      startListening();
+    }
+  };
 
-    return new Promise<void>((resolve) => {
-      const onFinish = () => {
-        console.log("🔚 Fin de speak()");
-        isSpeakingRef.current = false;
+  try {
+    console.log("🔊 Intentando TTS del backend...");
+    const audioBlob = await synthesizeSpeech(text, "es");
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
 
-        if (resumeAfterSpeechRef.current) {
-          resumeAfterSpeechRef.current = false;
-          startListening();
-        } else if (pendingStartListeningRef.current) {
-          pendingStartListeningRef.current = false;
-          startListening();
-        }
-
+    return await new Promise<void>((resolve) => {
+      audio.onended = () => {
+        console.log("Terminó de hablar (backend TTS)");
+        URL.revokeObjectURL(audioUrl);
+        finish();
         resolve();
       };
 
-      fallbackToSpeechSynthesisWithCallback(text, onFinish);
+      audio.onerror = (error) => {
+        console.error("Error al reproducir audio del backend, usando speechSynthesis:", error);
+        URL.revokeObjectURL(audioUrl);
+        fallbackToSpeechSynthesisWithCallback(text, () => {
+          finish();
+          resolve();
+        });
+      };
+
+      audio
+        .play()
+        .catch((error) => {
+          console.error("Error al iniciar reproducción, usando speechSynthesis:", error);
+          URL.revokeObjectURL(audioUrl);
+          fallbackToSpeechSynthesisWithCallback(text, () => {
+            finish();
+            resolve();
+          });
+        });
     });
-  };
+  } catch (error) {
+    console.error("Error generando audio en backend, usando speechSynthesis:", error);
+    return new Promise<void>((resolve) => {
+      fallbackToSpeechSynthesisWithCallback(text, () => {
+        finish();
+        resolve();
+      });
+    });
+  }
+};
 
   const fallbackToSpeechSynthesisWithCallback = (
     text: string,
