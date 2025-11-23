@@ -14,6 +14,9 @@ interface TodoWidgetProps {
 const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(
+    localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")!) : null
+  );
 
   // Obtener usuario actual
   const user = localStorage.getItem("user")
@@ -25,13 +28,13 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
   // ================================
   const fetchTasks = async () => {
     try {
-      if (!user) {
+      if (!currentUser) {
         setLoading(false);
         return;
       }
 
       const response = await fetch(
-        `http://localhost:5001/api/tasks/${user.id}`
+        `http://localhost:5001/api/tasks/${currentUser.id}`
       );
 
       const data = await response.json();
@@ -53,11 +56,34 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
     fetchTasks();
   }, [refresh]);
 
+  // Detectar cambios en localStorage (logout/login)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const stored = localStorage.getItem("user");
+      const parsed = stored ? JSON.parse(stored) : null;
+
+      // Si hubo cambio real → actualizar estado
+      if (
+        (parsed && !currentUser) ||
+        (!parsed && currentUser) ||
+        (parsed && currentUser && parsed.id !== currentUser.id)
+      ) {
+        setCurrentUser(parsed);
+        setTasks([]); // limpiar tareas inmediatamente
+        setLoading(true);
+        fetchTasks(); // recargar tareas
+      }
+    }, 500); // revisa 2 veces por segundo
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+
   // ================================
   // Borrar tarea (click = eliminar)
   // ================================
   const deleteTask = async (index: number) => {
-    if (!user) return;
+    if (!currentUser) return;
 
     try {
       const res = await fetch("http://localhost:5001/api/tasks/delete", {
@@ -66,7 +92,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user.id,
+          userId: currentUser.id,
           index: index,
         }),
       });
@@ -145,14 +171,14 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
       )}
 
       {/* Usuario no logeado */}
-      {!loading && !user && (
+      {!loading && !currentUser && (
         <p className="text-center text-sm text-[#8F4C00]">
           Inicia sesión para ver tus tareas
         </p>
       )}
 
       {/* Usuario logeado pero sin tareas */}
-      {!loading && user && tasks.length === 0 && (
+      {!loading && currentUser && tasks.length === 0 && (
         <p className="text-center text-sm text-[#8F4C00]">
           Nada por hacer 
         </p>
@@ -160,7 +186,7 @@ const TodoWidget: React.FC<TodoWidgetProps> = ({ refresh }) => {
 
       
       {/* Lista de tareas */}
-      {!loading && tasks.length > 0 && (
+      {!loading && currentUser && tasks.length > 0 && (
         <ul className="space-y-2">
           {sortedTasks.map((task, index) => {
             // Índice REAL dentro del arreglo tasks original
