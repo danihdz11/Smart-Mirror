@@ -1,7 +1,7 @@
 // src/hooks/useVirtualAssistant.ts
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { transcribeAudio, synthesizeSpeech } from "../services/api";
+import { transcribeAudio } from "../services/api";
 import {
   handleVoiceCommands,
   type CommandContext,
@@ -35,6 +35,9 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   const isFaceRecognitionActiveRef = useRef(false);
   const resumeAfterSpeechRef = useRef(false);
 
+  // ⏱ Timeout para “salir”
+  const muteTimeoutRef = useRef<number | null>(null);
+
   // =====================================================
   //  Helpers para flags
   // =====================================================
@@ -43,35 +46,68 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     hasGreetedRef.current = false;
   };
 
-  // 🔔 Sonidito cuando ya puede hablar el usuario
+  // =====================================================
+  //  Beep de “ya puedes hablar” (compatible Raspberry)
+  // =====================================================
   const playReadySound = () => {
     try {
       const AudioCtx =
         (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
+
+      if (!AudioCtx) {
+        console.warn("⚠️ AudioContext no disponible en este navegador");
+        return;
+      }
 
       const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // tono agudo
+      const startBeep = () => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
 
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.1,
+            ctx.currentTime + 0.01
+          );
+          gain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            ctx.currentTime + 0.3
+          );
 
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
 
-      osc.onended = () => {
-        ctx.close();
+          osc.start();
+          osc.stop(ctx.currentTime + 0.3);
+
+          osc.onended = () => {
+            ctx.close();
+          };
+        } catch (err: unknown) {
+          console.error("❌ Error durante beep:", err);
+          ctx.close();
+        }
       };
-    } catch (e) {
-      console.error("No se pudo reproducir el beep de listo para hablar:", e);
+
+      // A veces el contexto arranca “suspended” por autoplay
+      if (ctx.state === "suspended") {
+        ctx
+          .resume()
+          .then(startBeep)
+          .catch((err: unknown) => {
+            console.error("No se pudo reanudar AudioContext:", err);
+            ctx.close();
+          });
+      } else {
+        startBeep();
+      }
+    } catch (error: unknown) {
+      console.error("❌ No se pudo reproducir el beep:", error);
     }
   };
 
@@ -80,6 +116,11 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   // =====================================================
   const processTranscript = (transcript: string, confidence: number = 1.0) => {
     const normalizedTranscript = transcript.toLowerCase().trim();
+    const normalizedSimple = normalizedTranscript
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
 
     console.log("Escuché:", normalizedTranscript);
     console.log("Confianza:", confidence);
@@ -224,7 +265,37 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     }
 
     // ===========================
-    // 2) DELEGAR A ARCHIVO DE COMANDOS
+    // 2) COMANDO GLOBAL "salir"
+    // ===========================
+    if (normalizedSimple === "salir") {
+      console.log(
+        "🛑 Comando global 'salir' detectado: cerrar sesión y mutear 20 segundos"
+      );
+
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
+
+      stopListening();
+
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+
+      navigate("/mirror");
+
+      speak("Cerrando sesión. Volveré a escucharte en unos segundos.");
+
+      muteTimeoutRef.current = window.setTimeout(() => {
+        console.log("⏰ 20 segundos terminados, reactivando escucha");
+        startListening(); // esto llama a playReadySound() → beep
+      }, 20000);
+
+      return;
+    }
+
+    // ===========================
+    // 3) DELEGAR A ARCHIVO DE COMANDOS
     // ===========================
     const ctx: CommandContext = {
       locationPath: location.pathname,
@@ -272,7 +343,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       return;
     }
 
-    // ✅ Aquí SÍ suena el beep justo cuando realmente vamos a escuchar
+    // 🔔 Beep de listo para hablar
     playReadySound();
 
     try {
@@ -502,7 +573,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   };
 
   // =====================================================
-  //  Hablar: backend TTS + fallback speechSynthesis
+  //  Hablar usando speechSynthesis del navegador
   // =====================================================
   const speak = async (text: string): Promise<void> => {
     if (!text || text.trim().length === 0) {
@@ -514,76 +585,24 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
     isSpeakingRef.current = true;
     pendingStartListeningRef.current = false;
 
-    const finish = () => {
-      console.log("🔚 Fin de speak()");
-      isSpeakingRef.current = false;
+    return new Promise<void>((resolve) => {
+      const onFinish = () => {
+        console.log("🔚 Fin de speak()");
+        isSpeakingRef.current = false;
 
-      // Si venimos de reconocimiento facial
-      if (resumeAfterSpeechRef.current) {
-        resumeAfterSpeechRef.current = false;
-        startListening(); // aquí se disparará el beep
-        return;
-      }
+        if (resumeAfterSpeechRef.current) {
+          resumeAfterSpeechRef.current = false;
+          startListening();
+        } else if (pendingStartListeningRef.current) {
+          pendingStartListeningRef.current = false;
+          startListening();
+        }
 
-      // Caso general
-      if (pendingStartListeningRef.current) {
-        pendingStartListeningRef.current = false;
-        startListening(); // aquí también sonará el beep
-      }
-    };
+        resolve();
+      };
 
-    try {
-      console.log("🔊 Intentando TTS del backend...");
-      const audioBlob = await synthesizeSpeech(text, "es");
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-
-      return await new Promise<void>((resolve) => {
-        audio.onended = () => {
-          console.log("Terminó de hablar (backend TTS)");
-          URL.revokeObjectURL(audioUrl);
-          finish();
-          resolve();
-        };
-
-        audio.onerror = (error) => {
-          console.error(
-            "Error al reproducir audio del backend, usando speechSynthesis:",
-            error
-          );
-          URL.revokeObjectURL(audioUrl);
-          fallbackToSpeechSynthesisWithCallback(text, () => {
-            finish();
-            resolve();
-          });
-        };
-
-        audio
-          .play()
-          .catch((error) => {
-            console.error(
-              "Error al iniciar reproducción, usando speechSynthesis:",
-              error
-            );
-            URL.revokeObjectURL(audioUrl);
-            fallbackToSpeechSynthesisWithCallback(text, () => {
-              finish();
-              resolve();
-            });
-          });
-      });
-    } catch (error) {
-      console.error(
-        "Error generando audio en backend, usando speechSynthesis:",
-        error
-      );
-      return new Promise<void>((resolve) => {
-        fallbackToSpeechSynthesisWithCallback(text, () => {
-          finish();
-          resolve();
-        });
-      });
-    }
+      fallbackToSpeechSynthesisWithCallback(text, onFinish);
+    });
   };
 
   const fallbackToSpeechSynthesisWithCallback = (
@@ -702,6 +721,10 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   useEffect(() => {
     return () => {
       stopListening();
+      if (muteTimeoutRef.current) {
+        clearTimeout(muteTimeoutRef.current);
+        muteTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -789,7 +812,9 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
           const user = JSON.parse(userFromStorage);
           const userName = user.name || "Usuario";
 
-          console.log(`Usuario ${userName} entró a su perfil, saludando...`);
+          console.log(
+            `Usuario ${userName} entró a su perfil, saludando...`
+          );
 
           stopListening();
           hasWelcomedToProfileRef.current = true;
