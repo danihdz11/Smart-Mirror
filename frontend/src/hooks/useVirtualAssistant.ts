@@ -505,35 +505,38 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
   // =====================================================
   //  Hablar usando SOLO speechSynthesis del navegador
   // =====================================================
-  const speak = async (text: string): Promise<void> => {
-    if (!text || text.trim().length === 0) {
-      return Promise.resolve();
-    }
+const speak = async (text: string): Promise<void> => {
+  if (!text || text.trim().length === 0) return;
 
-    // 🔇 Siempre que el bot hable, apagamos el micrófono
-    stopListening();
-    isSpeakingRef.current = true;
-    pendingStartListeningRef.current = false;
+  stopListening();
 
-    return new Promise<void>((resolve) => {
-      const onFinish = () => {
-        console.log("🔚 Fin de speak()");
-        isSpeakingRef.current = false;
+  const voices = window.speechSynthesis.getVoices();
 
-        if (resumeAfterSpeechRef.current) {
-          resumeAfterSpeechRef.current = false;
-          startListening();
-        } else if (pendingStartListeningRef.current) {
-          pendingStartListeningRef.current = false;
-          startListening();
-        }
-
+  // 👉 Si hay voces (PC/Mac), usa speechSynthesis
+  if (voices && voices.length > 0) {
+    return new Promise((resolve) => {
+      fallbackToSpeechSynthesisWithCallback(text, () => {
         resolve();
-      };
-
-      fallbackToSpeechSynthesisWithCallback(text, onFinish);
+        startListening();
+      });
     });
-  };
+  }
+
+  console.warn("⚠️ No hay voces en esta plataforma, usando backend TTS (espeak-ng)");
+
+  // 👉 Si NO hay voces (Raspberry), usa backend
+  await fetch("http://localhost:5001/api/speak", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  // darle tiempo para hablar
+  setTimeout(() => {
+    startListening();
+  }, 800);
+};
+
 
   const fallbackToSpeechSynthesisWithCallback = (
     text: string,

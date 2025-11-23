@@ -14,6 +14,9 @@ import speechRoutes from "./routes/speechRoutes.js";
 
 const app = express();
 
+import speakRoute from "./routes/speak.js";
+app.use("/api/speak", speakRoute);
+
 // 🔌 Conectar a la base de datos
 connectDB();
 
