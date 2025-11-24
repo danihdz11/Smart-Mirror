@@ -231,7 +231,7 @@ const voiceCommands: VoiceCommand[] = [
     };
 
     await ctx.speak(
-      `Perfecto. Guardaré la tarea: ${title}. ¿Para qué fecha es esta tarea? Puedes decir hoy, mañana o una fecha como 25/02. Si no quieres fecha, di sin fecha.`
+      `Perfecto. Guardaré la tarea: ${title}. ¿Para qué fecha es esta tarea? Puedes decir hoy, mañana o una fecha como 25 barra 11. Si no quieres fecha, di sin fecha.`
     );
 
     setTimeout(() => ctx.startListening(), 800);
@@ -272,7 +272,7 @@ const voiceCommands: VoiceCommand[] = [
 
     if (date === null && !rawDatePhrase.toLowerCase().includes("sin fecha")) {
       await ctx.speak(
-        "No entendí la fecha. Intenta decir hoy, mañana, pasado mañana, una fecha como 25/02 o di sin fecha."
+        "No entendí la fecha. Intenta decir hoy, mañana, una fecha como 25 barra 11 o di sin fecha."
       );
       // seguimos en awaitingDate
       setTimeout(() => ctx.startListening(), 1200);
