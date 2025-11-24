@@ -499,7 +499,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
             }
           }, 100);
         }
-      }, 3000);
+      }, 5000);
     } catch (error) {
       console.error("Error al acceder al micrófono:", error);
       setIsListening(false);
