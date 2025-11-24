@@ -779,7 +779,7 @@ export function useVirtualAssistant(options?: { onTasksChanged?: () => void }) {
       const timer = setTimeout(() => {
         console.log("Haciendo pregunta: ¿Deseas iniciar sesión?");
         speak(
-          "¿Deseas iniciar sesión? Responde sí en inglés o claro para leer tu rostro, o no para continuar sin iniciar sesión."
+          "¿Deseas iniciar sesión? Responde sí en inglés o claro para leer tu rostro."
         );
 
         setTimeout(() => {
